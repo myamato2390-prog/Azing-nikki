@@ -6,7 +6,7 @@
 export const KINDS = ['aji', 'tachiuo'];
 export const KIND = 'aji'; // kind がない古い記録はアジ
 export const KIND_NAME = { aji: 'アジ', tachiuo: 'タチウオ' };
-export const KIND_COLOR = { aji: '#d9b54a', tachiuo: '#c3cad2' }; // 金・銀
+export const KIND_COLOR = { aji: '#e4d3a6', tachiuo: '#c3cad2' }; // 金・銀
 export const kindName = (k) => KIND_NAME[k] || KIND_NAME[KIND];
 export const APP_ID = 'aji-nikki';
 

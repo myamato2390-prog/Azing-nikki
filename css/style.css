@@ -325,7 +325,7 @@ th { background: var(--main-soft); color: var(--main-text); font-size: 13px; }
 .tide-note { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 2px; }
 
 /* ---------- 釣り物の色：アジ＝金、タチウオ＝銀、両方＝斜めに分ける ---------- */
-:root { --gold: #d9b54a; --silver: #c3cad2; --ink: #0f2a44; --both: linear-gradient(135deg, var(--gold) 0 50%, var(--silver) 50% 100%); }
+:root { --gold: #e4d3a6; --silver: #c3cad2; --ink: #0f2a44; --both: linear-gradient(135deg, var(--gold) 0 50%, var(--silver) 50% 100%); }
 .card-head { background: var(--kind, var(--gold)) center / cover no-repeat; color: var(--ink); border-left: 8px solid var(--river); }
 .card-head.has-photo { color: #fff; border-bottom: 6px solid var(--kind, var(--gold)); }
 .card-head .kind-tag { margin-left: auto; font-weight: 800; font-size: 12px; background: rgba(15,42,68,.12); border-radius: 8px; padding: 0 8px; }
