@@ -49,7 +49,7 @@ export function seasonSheets(trips, season) {
   const listRows = [head(LIST_COLUMNS.map((c) => c[0])), ...list.map((t) => LIST_COLUMNS.map((c) => c[2](t) ?? null))];
 
   const sum = [];
-  sum.push([{ v: `アジ日記 ${season}年まとめ`, s: 'title' }]);
+  sum.push([{ v: `お豆日記 ${season}年まとめ`, s: 'title' }]);
   sum.push([]);
   const kv = [
     ['釣行回数', s.tripCount, '回'],

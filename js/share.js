@@ -142,7 +142,7 @@ function drawSeason(ctx, year, s, colorOf, measureOnly) {
     ctx.fillStyle = main; ctx.fillRect(0, 0, W, 210);
   }
   y = 92; text(`${year}年のまとめ`, PAD, 64, '#fff', 800);
-  y = 160; text('アジ日記 アジングの記録', PAD, 32, '#eaf3fa', 500);
+  y = 160; text('お豆日記 アジングの記録', PAD, 32, '#eaf3fa', 500);
 
   // 数字のマス（3列×2段）
   const tiles = [
@@ -198,7 +198,7 @@ export async function shareBlob(blob, name, text) {
 }
 
 export function shareText(t) {
-  const L = [`【アジ日記】${formatDate(t.date)}`, t.river];
+  const L = [`【お豆日記】${formatDate(t.date)}`, t.river];
   if (t.title) L.push(`「${t.title}」`);
   L.push(`釣果 ${has(t.count) ? t.count : '-'}匹${has(t.maxSize) ? ` / 最大${t.maxSize}cm` : ''}${has(t.bare) ? ` / バラシ${t.bare}` : ''}`);
   if (t.aji.tide.shiomawari) L.push(t.aji.tide.shiomawari);
@@ -207,7 +207,7 @@ export function shareText(t) {
 
 export async function shareTrip(t, color) {
   const blob = await renderCardImage(t, color);
-  const file = new File([blob], `アジ日記_${t.date}_${t.river || ''}.png`, { type: 'image/png' });
+  const file = new File([blob], `お豆日記_${t.date}_${t.river || ''}.png`, { type: 'image/png' });
   if (navigator.canShare?.({ files: [file] })) {
     try {
       await navigator.share({ files: [file], text: shareText(t) });

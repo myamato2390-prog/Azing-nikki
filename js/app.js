@@ -15,7 +15,7 @@ import { placeStats, similarTrips, personalBests, recordBadges, newRecords } fro
 import { fetchWeather } from './weather.js';
 import { shiomawari, tideForTrip } from './tide.js';
 
-const APP_VERSION = '0.2.0';
+const APP_VERSION = '0.2.1';
 const STAR_TYPES = ['jigheads', 'worms', 'ranges', 'actions'];
 
 const state = {
@@ -1048,12 +1048,12 @@ function viewSeason(season) {
   $('#season-image', root)?.addEventListener('click', async () => {
     toast('画像を作成中…');
     const blob = await renderSeasonImage(year, s, placeColor);
-    const r = await shareBlob(blob, `アジ日記_${year}年まとめ.png`, `【アジ日記】${year}年 ${s.tripCount}回 ${s.totalCount}匹${s.maxSize ? ` 最大${s.maxSize}cm` : ''}`);
+    const r = await shareBlob(blob, `お豆日記_${year}年まとめ.png`, `【お豆日記】${year}年 ${s.tripCount}回 ${s.totalCount}匹${s.maxSize ? ` 最大${s.maxSize}cm` : ''}`);
     if (r === 'downloaded') toast('画像を保存しました。LINEから送ってください');
   });
   $('#export', root)?.addEventListener('click', () => {
     const bytes = seasonXlsx(trips, year);
-    downloadBlob(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `アジ日記_${year}年.xlsx`);
+    downloadBlob(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `お豆日記_${year}年.xlsx`);
     toast('Excelファイルを保存しました');
   });
 }
@@ -1110,8 +1110,8 @@ function viewSettings() {
       <p class="muted">読み込んでも、今ある記録は消えません（同じ記録は新しい方を残します）。</p>
 
       <h3>このアプリについて</h3>
-      <p class="muted">アジ日記 v${APP_VERSION}<br>Androidでは Chrome のメニューから「ホーム画面に追加」（または「アプリをインストール」）すると、アプリとして使えます。電波のない堤防でも動きます（音声入力と天気・風の自動入力だけは電波が必要です）。天気は Open-Meteo の予報データを使っています。</p>
-      <p class="muted">満潮・干潮のめやすは、気象庁「推算潮位の計算に用いた調和定数（60分潮）」（松山・宇和島、https://www.data.jma.go.jp/kaiyou/db/tide/suisan/）をもとにアジ日記が計算したもので、気象庁の発表値ではありません。実際の潮は天気や風で変わります。<br>出典：気象庁ホームページ</p>
+      <p class="muted">お豆日記 v${APP_VERSION}<br>Androidでは Chrome のメニューから「ホーム画面に追加」（または「アプリをインストール」）すると、アプリとして使えます。電波のない堤防でも動きます（音声入力と天気・風の自動入力だけは電波が必要です）。天気は Open-Meteo の予報データを使っています。</p>
+      <p class="muted">満潮・干潮のめやすは、気象庁「推算潮位の計算に用いた調和定数（60分潮）」（松山・宇和島、https://www.data.jma.go.jp/kaiyou/db/tide/suisan/）をもとにお豆日記が計算したもので、気象庁の発表値ではありません。実際の潮は天気や風で変わります。<br>出典：気象庁ホームページ</p>
     `;
   };
 
@@ -1170,7 +1170,7 @@ function viewSettings() {
     } else if (act === 'backup') {
       // 鮎日記のバックアップと同じ形（app・version・exportedAt・trips・presets＋港の設定）
       const data = { app: APP_ID, version: 1, exportedAt: new Date().toISOString(), trips: state.trips, presets: state.presets, places: state.places };
-      downloadBlob(new Blob([JSON.stringify(data)], { type: 'application/json' }), `アジ日記_バックアップ_${todayISO()}.json`);
+      downloadBlob(new Blob([JSON.stringify(data)], { type: 'application/json' }), `お豆日記_バックアップ_${todayISO()}.json`);
       toast('バックアップを保存しました');
     }
   });
@@ -1182,8 +1182,8 @@ function viewSettings() {
     if (!file) return;
     let data;
     try { data = JSON.parse(await file.text()); } catch { return toast('バックアップファイルを読み込めませんでした'); }
-    if (data?.app === 'ayu-nikki') return toast('これは鮎日記のバックアップです。アジ日記には読み込めません');
-    if (data?.app !== APP_ID || !Array.isArray(data.trips)) return toast('アジ日記のバックアップファイルではないようです');
+    if (data?.app === 'ayu-nikki') return toast('これは鮎日記のバックアップです。お豆日記には読み込めません');
+    if (data?.app !== APP_ID || !Array.isArray(data.trips)) return toast('お豆日記のバックアップファイルではないようです');
     try {
       // 今ある記録は消さない。同じ記録は新しい方を残す
       const mine = new Map(state.trips.map((t) => [t.id, t]));

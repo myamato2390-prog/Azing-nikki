@@ -1,4 +1,6 @@
-# アジ日記（Aji-Nikki）
+# お豆日記（Aji-Nikki）
+
+画面に出るアプリ名は「お豆日記」（v0.2.1 で「アジ日記」から変更）。端末内の保存先（IndexedDB `aji-nikki`）・バックアップの `app: 'aji-nikki'`・記録の `kind: 'aji'` は変えていない（変えると記録が読めなくなるため）。
 
 アジング専用の釣行日記・記録手帳アプリ（Android向け PWA）。仕様は [SPEC.md](SPEC.md)。
 
