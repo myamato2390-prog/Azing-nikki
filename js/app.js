@@ -16,7 +16,7 @@ import { placeStats, similarTrips, personalBests, recordBadges, newRecords } fro
 import { fetchWeather } from './weather.js';
 import { shiomawari, tideForTrip } from './tide.js';
 
-const APP_VERSION = '0.3.0';
+const APP_VERSION = '0.3.1';
 
 const state = {
   trips: [],
@@ -38,12 +38,49 @@ const clone = (o) => JSON.parse(JSON.stringify(o));
 const uniq = (arr) => [...new Set(arr.filter(Boolean))];
 const nowHM = () => new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
 
-function toast(msg) {
+// 下に出るお知らせ。action を渡すとボタン（「元に戻す」など）付きで長めに出す
+function toast(msg, action) {
   const el = $('#toast');
   el.textContent = msg;
+  el.classList.toggle('with-action', !!action);
+  if (action) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = action.label;
+    b.onclick = () => { el.classList.remove('show'); action.fn(); };
+    el.append(b);
+  }
   el.classList.add('show');
   clearTimeout(toast.t);
-  toast.t = setTimeout(() => el.classList.remove('show'), 2600);
+  toast.t = setTimeout(() => el.classList.remove('show'), action ? 8000 : 2600);
+}
+
+// 記録を消す。「両方」の日の片方を消したら、残った方の「両方」の印を外す。
+// 消した直後は「元に戻す」で戻せる（after は戻したあとに画面を描き直す処理）
+async function deleteTrips(ids, after) {
+  const gone = state.trips.filter((t) => ids.includes(t.id));
+  const pids = new Set(gone.map((t) => t.pairId).filter(Boolean));
+  const partners = state.trips.filter((t) => !ids.includes(t.id) && t.pairId && pids.has(t.pairId)).map(clone);
+  for (const t of gone) await db.del('trips', t.id);
+  state.trips = state.trips.filter((t) => !ids.includes(t.id));
+  for (const p of partners) {
+    const t = state.trips.find((x) => x.id === p.id);
+    t.pairId = '';
+    await db.put('trips', t);
+  }
+  if (ids.includes(state.currentId)) state.currentId = null;
+  toast(`${gone.length > 1 ? `${gone.length}件の記録を` : ''}削除しました`, {
+    label: '元に戻す',
+    fn: async () => {
+      await db.putMany('trips', [...gone, ...partners]);
+      for (const t of [...gone, ...partners]) {
+        const i = state.trips.findIndex((x) => x.id === t.id);
+        if (i >= 0) state.trips[i] = t; else state.trips.push(t);
+      }
+      toast('元に戻しました');
+      after?.();
+    },
+  });
 }
 
 function getPath(obj, path) {
@@ -1096,12 +1133,9 @@ function viewEdit(id, tab = 'before') {
       clearTimeout(timer);
       dirty = false;
       state.onLeave = null;
-      for (const t of list()) await db.del('trips', t.id);
-      const ids = list().map((t) => t.id);
-      state.trips = state.trips.filter((t) => !ids.includes(t.id));
-      state.currentId = null;
-      toast('削除しました');
+      const ids = list().map((t) => t.id).filter((x) => saved.has(x));
       location.hash = '#/';
+      if (ids.length) await deleteTrips(ids, () => route());
     }
   });
 
@@ -1335,8 +1369,15 @@ function viewSettings() {
         <button type="button" class="btn small danger" data-act="del-preset" data-id="${p.id}">削除</button></li>`).join('')}</ul>`
         : '<p class="muted">入力画面の「仕掛け」欄にある「プリセットに保存」から登録できます。</p>'}
 
+      <h3>記録を1件ずつ消す</h3>
+      <details class="del-box" id="del-box">
+        <summary>試しに入れた記録などを消すときに開きます（${state.trips.length}件）</summary>
+        <p class="muted">「消す…」を押してから、もう一度「本当に消す」を押すと消えます。消した直後は、下に出る「元に戻す」で戻せます。「両方」の日のアジとタチウオは、別々に消せます。</p>
+        <ul class="del-list" id="del-list"></ul>
+      </details>
+
       <h3>バックアップ</h3>
-      <p class="muted">記録はこのスマホの中だけに保存されています。機種変更やブラウザのデータ削除に備えて、ときどき書き出してください。（現在 ${state.trips.length} 件）</p>
+      <p class="muted">記録はこのスマホの中だけに保存されています。機種変更やブラウザのデータ削除に備えて、ときどき書き出してください。（現在 <span id="trip-count">${state.trips.length}</span> 件）</p>
       <div class="tools">
         <button type="button" class="btn" data-act="backup">書き出す</button>
         <label class="btn"><input type="file" accept="application/json,.json" hidden id="restore">読み込む</label>
@@ -1347,9 +1388,26 @@ function viewSettings() {
       <p class="muted">お豆日記 v${APP_VERSION}<br>Androidでは Chrome のメニューから「ホーム画面に追加」（または「アプリをインストール」）すると、アプリとして使えます。アジとタチウオの釣行を記録できます。電波のない堤防でも動きます（音声入力と天気・風の自動入力だけは電波が必要です）。天気は Open-Meteo の予報データを使っています。</p>
       <p class="muted">満潮・干潮のめやすは、気象庁「推算潮位の計算に用いた調和定数（60分潮）」（松山・宇和島、https://www.data.jma.go.jp/kaiyou/db/tide/suisan/）をもとにお豆日記が計算したもので、気象庁の発表値ではありません。実際の潮は天気や風で変わります。<br>出典：気象庁ホームページ</p>
     `;
+    renderDelList();
   };
 
   const savePlaces = async () => { await db.setKV('places', state.places); };
+
+  // 記録を1件ずつ消す一覧（新しい順）
+  const renderDelList = () => {
+    const ul = $('#del-list', root);
+    if (!ul) return;
+    const list = sortTrips(state.trips).reverse();
+    ul.innerHTML = list.map((t) => `
+      <li data-del-id="${t.id}">
+        <span class="del-main"><span class="r-date">${formatDate(t.date)} ${esc(t.startTime)}</span>
+          <span><i class="r-kind" style="--kind:${KIND_COLOR[t.kind]}">${esc(kindName(t.kind))}</i>${esc(t.river || '港未入力')} ${has(t.count) ? `${esc(t.count)}匹` : '（釣行後まだ）'}${t.title ? `「${esc(t.title)}」` : ''}</span></span>
+        <span class="del-acts"><button type="button" class="btn small" data-act="del-ask">消す…</button></span>
+      </li>`).join('') || '<li class="muted">記録はありません</li>';
+    $('#del-box summary', root).textContent = `試しに入れた記録などを消すときに開きます（${state.trips.length}件）`;
+    const c = $('#trip-count', root);
+    if (c) c.textContent = state.trips.length;
+  };
 
   root.addEventListener('input', (e) => {
     const el = e.target.closest('[data-rf]');
@@ -1375,6 +1433,21 @@ function viewSettings() {
     }
     const btn = e.target.closest('[data-act]');
     const act = btn?.dataset.act;
+    const li = btn?.closest('[data-del-id]');
+    if (act === 'del-ask') {
+      // 1回目：確かめるボタンに変える（5秒で元に戻る）
+      li.classList.add('asking');
+      li.querySelector('.del-acts').innerHTML = '<button type="button" class="btn small danger-fill" data-act="del-yes">本当に消す</button><button type="button" class="btn small" data-act="del-no">やめる</button>';
+      clearTimeout(li._t);
+      li._t = setTimeout(() => { if (li.isConnected) renderDelList(); }, 5000);
+      return;
+    }
+    if (act === 'del-no') { renderDelList(); return; }
+    if (act === 'del-yes') {
+      await deleteTrips([li.dataset.delId], () => { if (root.isConnected) { renderDelList(); $('#del-box', root).open = true; } });
+      renderDelList();
+      return;
+    }
     if (act === 'here') {
       const i = Number(btn.closest('.river-item').dataset.i);
       navigator.geolocation.getCurrentPosition((pos) => {

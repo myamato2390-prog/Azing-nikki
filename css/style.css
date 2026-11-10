@@ -361,3 +361,16 @@ th { background: var(--main-soft); color: var(--main-text); font-size: 13px; }
 .size-total { margin-top: 6px; font-weight: 800; color: var(--main-text); }
 .add-lbl { font-size: 13px; font-weight: 700; color: var(--sub); white-space: nowrap; }
 .r-kind { font-style: normal; font-size: 11px; font-weight: 800; color: var(--ink); background: var(--kind); border-radius: 6px; padding: 0 5px; margin-right: 6px; }
+
+/* ---------- お知らせのボタン・記録を消す ---------- */
+.toast.with-action { pointer-events: auto; display: flex; align-items: center; gap: 12px; }
+.toast button { border: 0; background: var(--accent); color: #3a2a00; font-weight: 800; border-radius: 14px; padding: 6px 12px; cursor: pointer; }
+.del-box summary { cursor: pointer; padding: 10px 12px; background: var(--card); border-radius: 10px; font-size: 14px; color: var(--sub); }
+.del-box[open] summary { margin-bottom: 6px; }
+.del-list { list-style: none; padding: 0; margin: 0; }
+.del-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--card); border-radius: 10px; padding: 8px 10px; margin-bottom: 6px; font-size: 14px; }
+.del-list li.asking { outline: 2px solid var(--danger); }
+.del-main { display: grid; gap: 2px; min-width: 0; }
+.del-main span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.del-acts { display: flex; gap: 6px; flex: none; }
+.btn.danger-fill { background: var(--danger); border-color: var(--danger); color: #fff; }

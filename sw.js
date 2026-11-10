@@ -1,5 +1,5 @@
 // オフライン用キャッシュ。ファイルを変えたら VERSION を上げる
-const VERSION = 'aji-nikki-v0.3.0';
+const VERSION = 'aji-nikki-v0.3.1';
 const FILES = [
   './', './index.html', './manifest.webmanifest', './css/style.css',
   './js/app.js', './js/db.js', './js/model.js', './js/search.js', './js/stats.js',
