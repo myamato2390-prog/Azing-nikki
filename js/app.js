@@ -16,7 +16,7 @@ import { placeStats, similarTrips, personalBests, recordBadges, newRecords } fro
 import { fetchWeather } from './weather.js';
 import { shiomawari, tideForTrip } from './tide.js';
 
-const APP_VERSION = '0.3.1';
+const APP_VERSION = '0.3.2';
 
 const state = {
   trips: [],
@@ -1385,7 +1385,7 @@ function viewSettings() {
       <p class="muted">読み込んでも、今ある記録は消えません（同じ記録は新しい方を残します）。</p>
 
       <h3>このアプリについて</h3>
-      <p class="muted">お豆日記 v${APP_VERSION}<br>Androidでは Chrome のメニューから「ホーム画面に追加」（または「アプリをインストール」）すると、アプリとして使えます。アジとタチウオの釣行を記録できます。電波のない堤防でも動きます（音声入力と天気・風の自動入力だけは電波が必要です）。天気は Open-Meteo の予報データを使っています。</p>
+      <p class="muted">お豆日記 v${APP_VERSION}${db.IS_TEST ? '（テスト版：本番とは別の保存場所です）' : ''}<br>Androidでは Chrome のメニューから「ホーム画面に追加」（または「アプリをインストール」）すると、アプリとして使えます。アジとタチウオの釣行を記録できます。電波のない堤防でも動きます（音声入力と天気・風の自動入力だけは電波が必要です）。天気は Open-Meteo の予報データを使っています。</p>
       <p class="muted">満潮・干潮のめやすは、気象庁「推算潮位の計算に用いた調和定数（60分潮）」（松山・宇和島、https://www.data.jma.go.jp/kaiyou/db/tide/suisan/）をもとにお豆日記が計算したもので、気象庁の発表値ではありません。実際の潮は天気や風で変わります。<br>出典：気象庁ホームページ</p>
     `;
     renderDelList();
@@ -1561,6 +1561,11 @@ async function start() {
     return;
   }
   applyMode();
+  if (db.IS_TEST) {
+    document.body.classList.add('is-test');
+    document.body.insertAdjacentHTML('afterbegin', '<div class="test-band">テスト版（本番の記録とは別です）</div>');
+    document.title = '【テスト版】' + document.title;
+  }
   window.addEventListener('hashchange', route);
   // 画面を閉じる・アプリを切り替えるときも保存する
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') state.onLeave?.(); });

@@ -1,0 +1,52 @@
+# GitHub Pages に公開する
+#   本番   https://<ユーザー名>.github.io/Azing-nikki/          ← main
+#   テスト版 https://<ユーザー名>.github.io/Azing-nikki/preview/  ← 最後に push した作業ブランチ（claude/…）
+# main に push したときは、テスト版も main と同じ中身にする
+# 使うには Settings → Pages の Source を「GitHub Actions」にする
+name: Pages
+
+on:
+  push:
+    branches: [main, 'claude/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: 本番（main）を取り出す
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: prod
+      - name: テスト版（push したブランチ）を取り出す
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          path: test
+      - name: 公開するファイルを並べる
+        run: |
+          mkdir -p site/preview
+          rsync -a --exclude '.git' --exclude '.github' --exclude 'tests' --exclude 'tools' prod/ site/
+          rsync -a --exclude '.git' --exclude '.github' --exclude 'tests' --exclude 'tools' test/ site/preview/
+          touch site/.nojekyll
+          echo "本番: $(git -C prod log -1 --format='%h %s')"
+          echo "テスト版: ${{ github.ref_name }} $(git -C test log -1 --format='%h %s')"
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4

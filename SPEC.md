@@ -288,6 +288,19 @@
 | 8 | ✅ **シーズンまとめ・Excel・まとめ画像** |
 | 9 | ✅ **テーマとアイコン**（2-8）、暗い画面／明るい画面の切り替え |
 
+### 6-1. テスト版で確かめてから本番に出す（v0.3.2〜）
+
+| | URL | 中身 | 記録の保存場所 |
+|---|---|---|---|
+| 本番 | `https://myamato2390-prog.github.io/Azing-nikki/` | `main` | IndexedDB `aji-nikki` |
+| テスト版 | `https://myamato2390-prog.github.io/Azing-nikki/preview/` | 最後に push した作業ブランチ（`claude/…`）。main に push したときは main と同じ | IndexedDB `aji-nikki-test`（本番の記録には触れない） |
+
+1. 作業ブランチで直して push → GitHub Actions（`.github/workflows/pages.yml`）が数分でテスト版に公開
+2. 作者がスマホでテスト版を触って確かめる（画面の上に赤い「テスト版」の帯）。本番と同じ記録で試すときは、本番で書き出したバックアップをテスト版で読み込む（コピーなので本番は安全）
+3. 問題なければ作者が「メインして」→ main に反映 → 本番と仲間のスマホに届く
+- キャッシュ名も分ける（本番 `aji-nikki-v…`、テスト版 `aji-nikki-test-v…`）。Service Worker は自分の名前で始まるキャッシュだけを消す（同じ github.io の鮎日記のキャッシュを消さない）
+- 準備（1回だけ）：GitHub の Settings → Pages の Source を「GitHub Actions」にする
+
 開発メモ：
 
 - 画面の文言はやさしい日本語で。「河川」「ポイント」→「港」に言い換える（内部の項目名は `river` のまま）

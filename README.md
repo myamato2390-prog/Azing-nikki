@@ -25,6 +25,12 @@
 
 データはすべてスマホの中（IndexedDB）に保存され、外部には送信しません。
 
+## テスト版
+
+- 本番：`https://myamato2390-prog.github.io/Azing-nikki/`（main）
+- テスト版：`https://myamato2390-prog.github.io/Azing-nikki/preview/`（最後に push した作業ブランチ）。記録は本番とは別の場所に保存される
+- 公開は GitHub Actions（`.github/workflows/pages.yml`）。Settings → Pages の Source を「GitHub Actions」にしておく
+
 ## 開発
 
 ビルド不要の素の HTML / CSS / JavaScript（ES Modules）です。

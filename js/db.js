@@ -1,5 +1,7 @@
 // IndexedDB の薄いラッパー
-const DB_NAME = 'aji-nikki';
+// テスト版（/preview/）は別の保存場所を使い、本番の記録には触れない
+export const IS_TEST = typeof location !== 'undefined' && location.pathname.includes('/preview/');
+const DB_NAME = IS_TEST ? 'aji-nikki-test' : 'aji-nikki';
 const VERSION = 1;
 let dbp;
 

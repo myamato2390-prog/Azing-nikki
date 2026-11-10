@@ -1,5 +1,8 @@
 // オフライン用キャッシュ。ファイルを変えたら VERSION を上げる
-const VERSION = 'aji-nikki-v0.3.1';
+// テスト版（/preview/）は名前を分け、本番・テスト版・鮎日記のキャッシュを互いに消さない
+const TEST = self.location.pathname.includes('/preview/');
+const PREFIX = TEST ? 'aji-nikki-test-v' : 'aji-nikki-v';
+const VERSION = `${PREFIX}0.3.2`;
 const FILES = [
   './', './index.html', './manifest.webmanifest', './css/style.css',
   './js/app.js', './js/db.js', './js/model.js', './js/search.js', './js/stats.js',
@@ -11,9 +14,10 @@ self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));
 });
 
+// 自分の古い版のキャッシュだけを消す（同じ github.io の鮎日記などのキャッシュには触れない）
 self.addEventListener('activate', (e) => {
   e.waitUntil(caches.keys()
-    .then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k))))
+    .then((keys) => Promise.all(keys.filter((k) => k.startsWith(PREFIX) && k !== VERSION).map((k) => caches.delete(k))))
     .then(() => self.clients.claim()));
 });
 
