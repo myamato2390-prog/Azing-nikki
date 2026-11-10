@@ -295,7 +295,7 @@
 | 本番 | `https://myamato2390-prog.github.io/Azing-nikki/` | `main` | IndexedDB `aji-nikki` |
 | テスト版 | `https://myamato2390-prog.github.io/Azing-nikki/preview/` | 最後に push した作業ブランチ（`claude/…`）。main に push したときは main と同じ | IndexedDB `aji-nikki-test`（本番の記録には触れない） |
 
-1. 作業ブランチで直して push → GitHub Actions（`.github/workflows/pages.yml`）が数分でテスト版に公開
+1. 作業ブランチで直して push → GitHub Actions（`.github/workflows/pages.yml`）が数分でテスト版に公開（GitHub Pages は main からしか公開できない初期設定のため、作業ブランチの push は「main から公開し直す」依頼だけを出し、公開そのものは main で行う）
 2. 作者がスマホでテスト版を触って確かめる（画面の上に赤い「テスト版」の帯）。本番と同じ記録で試すときは、本番で書き出したバックアップをテスト版で読み込む（コピーなので本番は安全）
 3. 問題なければ作者が「メインして」→ main に反映 → 本番と仲間のスマホに届く
 - キャッシュ名も分ける（本番 `aji-nikki-v…`、テスト版 `aji-nikki-test-v…`）。Service Worker は自分の名前で始まるキャッシュだけを消す（同じ github.io の鮎日記のキャッシュを消さない）

@@ -1,7 +1,9 @@
 # GitHub Pages に公開する
-#   本番   https://<ユーザー名>.github.io/Azing-nikki/          ← main
+#   本番     https://<ユーザー名>.github.io/Azing-nikki/          ← main
 #   テスト版 https://<ユーザー名>.github.io/Azing-nikki/preview/  ← 最後に push した作業ブランチ（claude/…）
-# main に push したときは、テスト版も main と同じ中身にする
+# GitHub Pages は main からしか公開できない（初期設定）ので、作業ブランチに push したときは
+# 「main から公開し直して」と頼み（relay）、実際の公開はいつも main で行う（deploy）。
+# main に push したときは、テスト版も main と同じ中身にする。
 # 使うには Settings → Pages の Source を「GitHub Actions」にする
 name: Pages
 
@@ -9,19 +11,35 @@ on:
   push:
     branches: [main, 'claude/**']
   workflow_dispatch:
-
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+    inputs:
+      preview:
+        description: 'テスト版に出すブランチ（空なら main）'
+        required: false
+        default: ''
 
 concurrency:
   group: pages
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  relay:
+    if: github.ref != 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: main から公開し直すよう頼む（テスト版＝このブランチ）
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --repo "${{ github.repository }}" --ref main -f preview="${{ github.ref_name }}"
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -31,10 +49,10 @@ jobs:
         with:
           ref: main
           path: prod
-      - name: テスト版（push したブランチ）を取り出す
+      - name: テスト版を取り出す
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref_name }}
+          ref: ${{ inputs.preview || 'main' }}
           path: test
       - name: 公開するファイルを並べる
         run: |
@@ -43,7 +61,7 @@ jobs:
           rsync -a --exclude '.git' --exclude '.github' --exclude 'tests' --exclude 'tools' test/ site/preview/
           touch site/.nojekyll
           echo "本番: $(git -C prod log -1 --format='%h %s')"
-          echo "テスト版: ${{ github.ref_name }} $(git -C test log -1 --format='%h %s')"
+          echo "テスト版: ${{ inputs.preview || 'main' }} $(git -C test log -1 --format='%h %s')"
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
