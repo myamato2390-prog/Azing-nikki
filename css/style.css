@@ -322,3 +322,4 @@ th { background: var(--main-soft); color: var(--main-text); font-size: 13px; }
 .river-item[open] { padding-bottom: 6px; }
 .gap { height: 8px; }
 .field select { appearance: auto; }
+.tide-note { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 2px; }

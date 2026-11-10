@@ -13,9 +13,9 @@ import { seasonXlsx } from './export.js';
 import { shareTrip, downloadBlob, renderSeasonImage, shareBlob } from './share.js';
 import { placeStats, similarTrips, personalBests, recordBadges, newRecords } from './insights.js';
 import { fetchWeather } from './weather.js';
-import { shiomawari } from './tide.js';
+import { shiomawari, tideForTrip } from './tide.js';
 
-const APP_VERSION = '0.1.0';
+const APP_VERSION = '0.2.0';
 const STAR_TYPES = ['jigheads', 'worms', 'ranges', 'actions'];
 
 const state = {
@@ -253,8 +253,8 @@ function cardHtml(t) {
       ${cell('潮回り', esc(a.tide.shiomawari))}
       ${cell('常夜灯', esc(a.light))}
       ${cell('天気', esc(weather), 'w2')}
-      ${cell('満潮', esc(highs), 'w2')}
-      ${cell('干潮', esc(lows), 'w2')}
+      ${cell(a.tide.auto ? '満潮（めやす）' : '満潮', esc(highs), 'w2')}
+      ${cell(a.tide.auto ? '干潮（めやす）' : '干潮', esc(lows), 'w2')}
       ${cell('風', esc(wind), 'w2')}
       ${cell('朝／最高', esc(formatDayTemps(t).replace('朝', '').replace('最高', '')), 'w2')}
       ${cell('水温', has(t.waterTemp) ? `${esc(t.waterTemp)}℃` : '')}
@@ -475,7 +475,7 @@ function viewEdit(id, tab = 'before') {
       <h3>潮</h3>
       ${group('潮回り（日付から自動）', chips(trip, 'aji.tide.shiomawari', SHIOMAWARI))}
       ${group('満潮・干潮（時刻と潮位）', `${tideRow('highs', '満潮')}${tideRow('lows', '干潮')}
-        <p class="muted">いまは手入力です。自動計算は準備中です。</p>`)}
+        <div class="tide-note"><span class="muted" id="tide-note"></span><button type="button" class="btn small" data-act="tide-auto" id="tide-auto" hidden>自動に戻す</button></div>`)}
 
       <h3>天気・風</h3>
       <div class="tools"><button type="button" class="btn small" data-act="weather">☀ 天気・風・気温を自動入力</button><span class="muted" id="weather-note"></span></div>
@@ -672,6 +672,39 @@ function viewEdit(id, tab = 'before') {
       <div class="thumb"><img src="${p.data}" alt=""><button type="button" data-act="del-photo" data-id="${p.id}" aria-label="写真を削除">×</button></div>`).join('');
   };
 
+  // 満潮・干潮の自動計算（めやす）。手で直したら自動では変えない
+  const tideNote = () => {
+    const ps = placeSetting(trip.river);
+    const off = Number(ps?.tideOffsetMin) || 0;
+    $('#tide-note', root).textContent = !aji.side
+      ? '港を選ぶと、満潮・干潮のめやすが自動で入ります。'
+      : aji.tide.auto
+        ? `めやす：${aji.tide.station || ''}（${sideName(aji.side)}の基準）の潮から計算${off ? `・補正${off > 0 ? '+' : ''}${off}分` : ''}${!trip.startTime || trip.startTime >= '12:00' ? '。午前の時刻は翌日です' : ''}`
+        : '手で直した値です。';
+    $('#tide-auto', root).hidden = aji.tide.auto || !aji.side;
+  };
+  const fillTide = () => {
+    if (aji.tide.auto) {
+      const ps = placeSetting(trip.river);
+      const r = tideForTrip(aji.side, trip.date, trip.startTime, ps?.tideOffsetMin || 0);
+      if (r) {
+        const before = JSON.stringify(aji.tide);
+        aji.tide.highs = r.highs.slice(0, 2);
+        aji.tide.lows = r.lows.slice(0, 2);
+        aji.tide.station = r.station;
+        for (const key of ['highs', 'lows']) {
+          slots[key] = tideSlots(key);
+          slots[key].forEach((x, i) => {
+            $(`[data-tide="${key}"][data-i="${i}"][data-tf="time"]`, root).value = x.time || '';
+            $(`[data-tide="${key}"][data-i="${i}"][data-tf="cm"]`, root).value = x.cm ?? '';
+          });
+        }
+        if (JSON.stringify(aji.tide) !== before) touch();
+      }
+    }
+    tideNote();
+  };
+
   // 満潮・干潮の入力欄 → 記録（空の欄は入れない。午前の時刻は翌日とみなす）
   const syncTide = () => {
     for (const key of ['highs', 'lows']) {
@@ -686,6 +719,7 @@ function viewEdit(id, tab = 'before') {
       if (ps) aji.side = ps.side;
       refreshInputs();
       refreshPlace();
+      fillTide();
       if ((weatherEmpty() || aji.weatherAuto) && navigator.onLine) fillWeather(true);
     }
     if (path === 'date') {
@@ -694,10 +728,11 @@ function viewEdit(id, tab = 'before') {
       autoShio = next;
       refreshInputs();
     }
+    if (path === 'date' || path === 'aji.side') fillTide();
     if (WEATHER_PATHS.includes(path)) aji.weatherAuto = false;
     // 時刻や日付を入れたら、自動入力のままの天気・風を取り直す
     if (['startTime', 'endTime', 'date'].includes(path) && aji.weatherAuto && navigator.onLine) fillWeather(true);
-    if (path === 'startTime' || path === 'endTime') { syncTide(); refreshEndNote(); }
+    if (path === 'startTime' || path === 'endTime') { if (aji.tide.auto) fillTide(); else syncTide(); refreshEndNote(); }
     if (['river', 'date', 'startTime', 'aji.side', 'aji.light', 'aji.windDir', 'aji.windSpeed', 'aji.tide.shiomawari'].includes(path)) refreshBoard();
     touch();
   });
@@ -708,7 +743,7 @@ function viewEdit(id, tab = 'before') {
     if (!el || el.dataset.tf === 'time') return; // 時刻は入力を終えたときに整える
     slots[el.dataset.tide][Number(el.dataset.i)].cm = el.value === '' ? null : Number(el.value);
     aji.tide.auto = false;
-    syncTide(); touch();
+    syncTide(); touch(); tideNote();
   });
   root.addEventListener('change', (e) => {
     const el = e.target.closest('[data-tide][data-tf="time"]');
@@ -716,9 +751,10 @@ function viewEdit(id, tab = 'before') {
     const v = normalizeTime(el.value);
     if (v === null) return; // 「4桁で入力してください」は共通の処理が出す
     el.value = v;
+    if (slots[el.dataset.tide][Number(el.dataset.i)].time === v) return;
     slots[el.dataset.tide][Number(el.dataset.i)].time = v;
     aji.tide.auto = false;
-    syncTide(); touch();
+    syncTide(); touch(); tideNote();
   });
 
   // 移動先の入力
@@ -753,6 +789,10 @@ function viewEdit(id, tab = 'before') {
     const act = el?.dataset.act;
     if (act === 'weather') {
       fillWeather(false);
+    } else if (act === 'tide-auto') {
+      aji.tide.auto = true;
+      fillTide();
+      toast('満潮・干潮を自動のめやすに戻しました');
     } else if (act === 'use-trip') {
       // 仕掛けと、★だったジグヘッド・ワームを「使った」として入れる
       const src = state.trips.find((t) => t.id === el.dataset.id);
@@ -869,6 +909,7 @@ function viewEdit(id, tab = 'before') {
   });
 
   refreshPlace();
+  fillTide();
   refreshEndNote();
   refreshBoard();
   renderLures();
@@ -1070,6 +1111,7 @@ function viewSettings() {
 
       <h3>このアプリについて</h3>
       <p class="muted">アジ日記 v${APP_VERSION}<br>Androidでは Chrome のメニューから「ホーム画面に追加」（または「アプリをインストール」）すると、アプリとして使えます。電波のない堤防でも動きます（音声入力と天気・風の自動入力だけは電波が必要です）。天気は Open-Meteo の予報データを使っています。</p>
+      <p class="muted">満潮・干潮のめやすは、気象庁「推算潮位の計算に用いた調和定数（60分潮）」（松山・宇和島、https://www.data.jma.go.jp/kaiyou/db/tide/suisan/）をもとにアジ日記が計算したもので、気象庁の発表値ではありません。実際の潮は天気や風で変わります。<br>出典：気象庁ホームページ</p>
     `;
   };
 
