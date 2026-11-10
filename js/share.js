@@ -1,7 +1,7 @@
 // カードを画像（PNG）にしてLINEなどへ共有する
 import {
   formatDate, formatWeather, formatDayTemps, formatWind, formatHighs, formatLows, formatTimeRange,
-  has, formatMoves, THEME_COLOR, sideName, starText, tackleSummary, kindName, KIND_COLOR, formatSizes, maxF, block,
+  has, formatMoves, formatClock, THEME_COLOR, sideName, starText, tackleSummary, kindName, KIND_COLOR, formatSizes, maxF, block,
 } from './model.js';
 
 const W = 1080, PAD = 56;
@@ -73,6 +73,7 @@ function draw(ctx, t, photo, measureOnly, color) {
   if (!measureOnly) { ctx.fillStyle = C.accent; ctx.fillRect(PAD, y + 10, 120, 8); }
   y += 10;
   if (tachi) row('サイズ', formatSizes(b.sizes));
+  if (tachi) row('最初のアタリ', formatClock(t, b.firstHit));
   row('時合', [...(t.jiai || []), ...b.tideStages].join('・'));
   if (tachi) {
     row('仕掛け', [starText(b.rigs, 'rigs'), starText(b.tenya, 'tenya')].filter(Boolean).join('　'));

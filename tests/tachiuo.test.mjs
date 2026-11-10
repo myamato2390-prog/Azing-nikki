@@ -131,3 +131,15 @@ test('excel per kind', () => {
   assert.equal(aji[0].rows.length, 3);
   assert.equal(seasonXlsx(trips, 2026, 'tachiuo')[0], 0x50);
 });
+
+test('first bite time (tachiuo)', async () => {
+  const { formatClock } = await import('../js/model.js');
+  const t = normalizeTrip({ kind: 'tachiuo', date: '2026-11-14', startTime: '18:00', tachiuo: { firstHit: '01:20' } });
+  assert.equal(t.tachiuo.firstHit, '01:20');
+  assert.equal(normalizeTrip({ kind: 'tachiuo', date: '2026-11-14' }).tachiuo.firstHit, '');
+  assert.equal(formatClock(t, '01:20'), '翌01:20');
+  assert.equal(formatClock(t, '19:45'), '19:45');
+  const sh = seasonSheets([t], 2026, 'tachiuo');
+  const head = sh[0].rows[0].map((c) => c.v);
+  assert.equal(sh[0].rows[1][head.indexOf('最初のアタリ')], '翌01:20');
+});

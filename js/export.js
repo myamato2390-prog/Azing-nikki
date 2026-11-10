@@ -1,5 +1,5 @@
 // シーズンまとめ Excel の中身を組み立てる
-import { TACKLE_FIELDS, TACHI_TACKLE_FIELDS, F_SIZES, weekday, has, sortTrips, formatMoves, sideName, starText, formatHighs, formatLows, endsNextDay, kindName, maxF } from './model.js';
+import { TACKLE_FIELDS, TACHI_TACKLE_FIELDS, F_SIZES, formatClock, weekday, has, sortTrips, formatMoves, sideName, starText, formatHighs, formatLows, endsNextDay, kindName, maxF } from './model.js';
 import { summarize } from './stats.js';
 import { buildXlsx } from './xlsx.js';
 
@@ -48,6 +48,7 @@ const TACHI_COLUMNS = [
   ...F_SIZES.map((f) => [f, 7, (t) => n(t.tachiuo.sizes?.[f]) || null]),
   ['最大', 7, (t) => maxF(t.tachiuo.sizes)],
   ['バラシ', 7, (t) => n(t.bare)],
+  ['最初のアタリ', 9, (t) => formatClock(t, t.tachiuo.firstHit)],
   ['時合', 16, (t) => (t.jiai || []).join('、')],
   ['潮の動き', 16, (t) => (t.tachiuo.tideStages || []).join('、')],
   ['仕掛け', 14, (t) => starText(t.tachiuo.rigs, 'rigs')],

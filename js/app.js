@@ -4,7 +4,7 @@ import {
   WEATHER, WIND_DIRS, LIGHTS, SHIOMAWARI, SIZE_FEEL, JIAI, TIDE_STAGES, JIG_WEIGHTS, RANGES, ACTIONS, BYCATCH, LINE_TYPES, TACKLE_FIELDS,
   TACHI_TACKLE_FIELDS, RIGS, TENYA_WEIGHTS, BAITS, HYBRID, TACHI_ACTIONS, F_SIZES, SHARED_KEYS,
   newTrip, normalizeTrip, sortTrips, formatDate, formatWeather, formatDayTemps, formatWind, formatHighs, formatLows,
-  formatMoves, formatTimeRange, endsNextDay, isNextDayTime, normalizeTime, tackleSummary, block, sizesTotal, maxF,
+  formatMoves, formatTimeRange, endsNextDay, isNextDayTime, formatClock, normalizeTime, tackleSummary, block, sizesTotal, maxF,
   starKey, starItem, starLabel, starState, cycleStar, starredFirst, starText,
   has, num, uid, todayISO, seasonOf,
 } from './model.js';
@@ -249,7 +249,8 @@ function cardHtml(t) {
     </section>
     ${sizes.length ? `<div class="size-row">${sizes.map((f) => `<span><b>${f}</b>×${b.sizes[f]}</span>`).join('')}</div>` : ''}
     ${ps && ps.trips >= 2 ? `<div class="point-stats">📍 この港の${esc(kindName(t.kind))} 全${ps.trips}回・平均${ps.avg}匹・最多${ps.best}匹${ps.max ? `・最大${ps.max}${tachi ? '' : 'cm'}` : ''}</div>` : ''}
-    ${(t.jiai.length || b.tideStages.length || lure || b.bycatch?.length) ? `<section class="pills">
+    ${(t.jiai.length || b.tideStages.length || lure || b.bycatch?.length || (tachi && b.firstHit)) ? `<section class="pills">
+      ${tachi && b.firstHit ? `<div><em>初アタリ</em><span class="pill plain">${esc(formatClock(t, b.firstHit))}</span></div>` : ''}
       ${t.jiai.length || b.tideStages.length ? `<div><em>時合</em>${tags(t.jiai)}${tags(b.tideStages, 'plain')}</div>` : ''}
       ${tachi ? `
         ${b.rigs.length || b.tenya.length ? `<div><em>仕掛け</em>${stars('rigs')}${stars('tenya')}</div>` : ''}
@@ -560,6 +561,8 @@ function viewEdit(id, tab = 'before') {
     if (k === 'tachiuo') {
       return `<div class="kind-pane" style="--kind:${KIND_COLOR[k]}">${kindHead(k, 'タチウオの釣果')}
         ${common}
+        ${field('最初にアタリがあった時刻', timeInput(form, `${B}.firstHit`, '例: 1945'))}
+        <div id="first-hit-note" class="hint"></div>
         ${group('サイズごとの匹数', `<div class="sizes">${F_SIZES.map((f) => `<div class="size-step"><span class="size-lbl">${f}</span>${stepper(form, `${B}.sizes.${f}`, '匹')}</div>`).join('')}</div>
           <div class="size-total" id="size-total"></div>`)}
         ${group('バラシ', stepper(form, `${R}.bare`, '回'))}
@@ -678,6 +681,7 @@ function viewEdit(id, tab = 'before') {
     renderMoves();
     renderPhotos();
     refreshSizes();
+    refreshFirstHit();
   };
 
   const refreshInputs = () => {
@@ -720,6 +724,12 @@ function viewEdit(id, tab = 'before') {
     }
   };
 
+  const refreshFirstHit = () => {
+    const el = $('#first-hit-note', root);
+    if (!el || !recs.tachiuo) return;
+    const t = recs.tachiuo.tachiuo.firstHit;
+    el.textContent = t && isNextDayTime(S(), t) ? `翌日の ${t} として記録します` : '';
+  };
   const refreshSizes = () => {
     const el = $('#size-total', root);
     if (!el || !recs.tachiuo) return;
@@ -927,6 +937,7 @@ function viewEdit(id, tab = 'before') {
       refreshSizes();
     }
     if (path === 'tachiuo.tachiuo.rigs') renderLures();
+    if (path === 'tachiuo.tachiuo.firstHit' || path === 's.startTime') refreshFirstHit();
     touch();
   });
 

@@ -107,7 +107,7 @@ export function emptyAji() {
   return { tideStages: [], tackle: emptyTackle(), jigheads: [], worms: [], ranges: [], actions: [], bycatch: [] };
 }
 export function emptyTachiuo() {
-  return { tideStages: [], tackle: emptyTachiTackle(), rigs: [], tenya: [], baits: [], ranges: [], actions: [], sizes: emptySizes() };
+  return { firstHit: '', tideStages: [], tackle: emptyTachiTackle(), rigs: [], tenya: [], baits: [], ranges: [], actions: [], sizes: emptySizes() };
 }
 const EMPTY = { aji: emptyAji, tachiuo: emptyTachiuo };
 
@@ -245,10 +245,12 @@ export function tripHours(t) {
   return Math.round(d / 6) / 10;
 }
 
-// 夕方から始めた釣行では、午前の時刻は翌日とみなす（満潮・干潮の手入力用）
+// 夕方から始めた釣行では、午前の時刻は翌日とみなす（満潮・干潮・最初のアタリの時刻）
 export function isNextDayTime(t, time) {
   return !!(time && t.startTime && t.startTime >= '12:00' && time < '12:00');
 }
+// 「翌01:15」のように
+export const formatClock = (t, time) => (time ? `${isNextDayTime(t, time) ? '翌' : ''}${time}` : '');
 
 // ---------- ★（使った／良かった） ----------
 // type: 'jigheads'・'tenya' {g} / 'worms' {name,color} / 'ranges'・'actions'・'rigs'・'baits' {name}

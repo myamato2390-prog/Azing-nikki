@@ -235,6 +235,7 @@
 
   // ── タチウオ（kind: 'tachiuo' のときだけ）──
   tachiuo: {
+    firstHit: '',                 // 最初にアタリがあった時刻 'HH:MM'（夕方からの釣行で午前の時刻は翌日）
     tideStages: [],
     tackle: { rod, reel, pe, leader },          // pe＝PEの号数、leader＝リーダーの種類と号数
     rigs: [{ name, star }],                     // テンヤ／フリーフォール

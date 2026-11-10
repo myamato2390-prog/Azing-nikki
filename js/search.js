@@ -16,7 +16,7 @@ function haystack(t) {
     kindName(t.kind), t.river, t.memo, t.title, t.weather, t.sizeFeel, sideName(a.side), a.light, a.windDir, a.tide?.shiomawari,
     ...(t.moves || []).flatMap((m) => [m.river, m.point]),
     ...Object.values(b.tackle || {}),
-    ...(t.jiai || []), ...(b.tideStages || []), ...(b.bycatch || []), formatSizes(b.sizes),
+    ...(t.jiai || []), ...(b.tideStages || []), b.firstHit, ...(b.bycatch || []), formatSizes(b.sizes),
     ...STAR_TYPES.flatMap((k) => (b[k] || []).map((x) => starLabel(k, x))),
   ].filter(Boolean).join('\n').toLowerCase();
 }
