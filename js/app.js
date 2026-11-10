@@ -12,7 +12,7 @@ import { shareTrip, downloadBlob, renderSeasonImage, shareBlob } from './share.j
 import { pointStats, similarTrips, personalBests, recordBadges, newRecords } from './insights.js';
 import { fetchWeather } from './weather.js';
 
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '0.1.0';
 
 const state = {
   trips: [],
@@ -845,12 +845,12 @@ function viewSeason(season) {
   $('#season-image', root)?.addEventListener('click', async () => {
     toast('画像を作成中…');
     const blob = await renderSeasonImage(year, s, riverColor);
-    const r = await shareBlob(blob, `鮎日記_${year}シーズンまとめ.png`, `【鮎日記】${year}シーズン ${s.tripCount}回 ${s.totalCount}匹${s.maxSize ? ` 最大${s.maxSize}cm` : ''}`);
+    const r = await shareBlob(blob, `アジ日記_${year}シーズンまとめ.png`, `【アジ日記】${year}シーズン ${s.tripCount}回 ${s.totalCount}匹${s.maxSize ? ` 最大${s.maxSize}cm` : ''}`);
     if (r === 'downloaded') toast('画像を保存しました。LINEから送ってください');
   });
   $('#export', root)?.addEventListener('click', () => {
     const bytes = seasonXlsx(trips, year);
-    downloadBlob(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `鮎日記_${year}シーズン.xlsx`);
+    downloadBlob(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `アジ日記_${year}シーズン.xlsx`);
     toast('Excelファイルを保存しました');
   });
 }
@@ -900,7 +900,7 @@ function viewSettings() {
       </div>
 
       <h3>このアプリについて</h3>
-      <p class="muted">鮎日記 v${APP_VERSION}<br>Androidでは Chrome のメニューから「ホーム画面に追加」（または「アプリをインストール」）すると、アプリとして使えます。電波のない河原でも動きます（音声入力と天気の自動入力だけは電波が必要です）。天気は Open-Meteo の予報データを使っています。</p>
+      <p class="muted">アジ日記 v${APP_VERSION}<br>Androidでは Chrome のメニューから「ホーム画面に追加」（または「アプリをインストール」）すると、アプリとして使えます。電波のない河原でも動きます（音声入力と天気の自動入力だけは電波が必要です）。天気は Open-Meteo の予報データを使っています。</p>
     `;
   };
 
@@ -945,8 +945,8 @@ function viewSettings() {
       state.presets = state.presets.filter((x) => x.id !== p.id);
       render();
     } else if (act === 'backup') {
-      const data = { app: 'ayu-nikki', version: 1, exportedAt: new Date().toISOString(), trips: state.trips, presets: state.presets, rivers: state.rivers };
-      downloadBlob(new Blob([JSON.stringify(data)], { type: 'application/json' }), `鮎日記_バックアップ_${todayISO()}.json`);
+      const data = { app: 'aji-nikki', version: 1, exportedAt: new Date().toISOString(), trips: state.trips, presets: state.presets, rivers: state.rivers };
+      downloadBlob(new Blob([JSON.stringify(data)], { type: 'application/json' }), `アジ日記_バックアップ_${todayISO()}.json`);
       toast('バックアップを保存しました');
     }
   });
@@ -958,7 +958,7 @@ function viewSettings() {
     if (!file) return;
     try {
       const data = JSON.parse(await file.text());
-      if (data.app !== 'ayu-nikki' || !Array.isArray(data.trips)) throw new Error('format');
+      if (data.app !== 'aji-nikki' || !Array.isArray(data.trips)) throw new Error('format');
       if (!confirm(`${data.trips.length}件の釣行を読み込みます。同じ記録は上書きされます。よろしいですか？`)) return;
       const trips = data.trips.map(normalizeTrip);
       await db.putMany('trips', trips);

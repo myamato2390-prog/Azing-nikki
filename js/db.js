@@ -1,5 +1,5 @@
 // IndexedDB の薄いラッパー
-const DB_NAME = 'ayu-nikki';
+const DB_NAME = 'aji-nikki';
 const VERSION = 1;
 let dbp;
 

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0a1c30"/><stop offset="1" stop-color="#16406a"/>
+    </linearGradient>
+    <linearGradient id="beam" x1="1" y1="0" x2="0" y2="0">
+      <stop offset="0" stop-color="#f2c14e" stop-opacity=".95"/><stop offset="1" stop-color="#f2c14e" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#sky)"/>
+  <!-- 灯台の光 -->
+  <polygon points="372,206 96,150 96,236" fill="url(#beam)"/>
+  <!-- 海 -->
+  <rect y="300" width="512" height="212" fill="#1f6f9f"/>
+  <path d="M0 330 q32 -14 64 0 t64 0 t64 0 t64 0 t64 0 t64 0 t64 0 t64 0 v30 H0z" fill="#2a82b5" opacity=".6"/>
+  <!-- 細長い岬 -->
+  <path d="M512 252 C460 250 430 262 396 268 C340 278 250 290 120 300 L512 300 Z" fill="#4f8a5b"/>
+  <path d="M512 252 C460 250 430 262 396 268 C340 278 250 290 120 300 L512 300 Z" fill="#0f2a44" opacity=".25"/>
+  <!-- 灯台 -->
+  <path d="M362 268 L368 214 H384 L390 268 Z" fill="#f4f1e6"/>
+  <rect x="364" y="198" width="24" height="16" rx="3" fill="#f2c14e"/>
+  <path d="M362 198 L376 184 L390 198 Z" fill="#f4f1e6"/>
+  <!-- アジ -->
+  <g transform="translate(250 404)">
+    <path d="M-120 0 C-80 -44 20 -46 84 -6 L128 -36 L118 0 L128 36 L84 6 C20 46 -80 44 -120 0 Z" fill="#dfeaf2"/>
+    <path d="M-120 0 C-80 -44 20 -46 84 -6 L100 -17 C30 -30 -60 -28 -120 0 Z" fill="#5d87a8"/>
+    <path d="M-40 4 C10 -4 50 -2 86 2" stroke="#f2c14e" stroke-width="5" fill="none" stroke-linecap="round"/>
+    <circle cx="-84" cy="-6" r="9" fill="#0f2a44"/><circle cx="-86" cy="-8" r="3" fill="#fff"/>
+  </g>
+</svg>
