@@ -1,4 +1,4 @@
-import { num, has, seasonOf, sideName, starKey, starItem, starLabel, SHIOMAWARI } from './model.js';
+import { num, has, seasonOf, sideName, starKey, starItem, starLabel, SHIOMAWARI, block, maxF, fRank, F_SIZES } from './model.js';
 
 export function seasons(trips) {
   return [...new Set(trips.map(seasonOf).filter(Boolean))].sort((a, b) => b - a);
@@ -17,23 +17,27 @@ function group(trips, keyFn) {
   return m;
 }
 
+// 最大サイズ：アジは cm（数）、タチウオは F表記（'F5'）。比べるときは sizeScore
+export const tripMax = (t) => (t.kind === 'tachiuo' ? maxF(t.tachiuo?.sizes) || null : has(t.maxSize) ? Number(t.maxSize) : null);
+export const sizeScore = (t) => (t.kind === 'tachiuo' ? fRank(maxF(t.tachiuo?.sizes)) : has(t.maxSize) ? Number(t.maxSize) : 0);
+
 function rowOf(list) {
   const count = list.reduce((s, t) => s + num(t.count), 0);
-  const sizes = list.map((t) => t.maxSize).filter(has).map(Number);
+  const best = list.reduce((b, t) => (sizeScore(t) > (b ? sizeScore(b) : 0) ? t : b), null);
   return {
     trips: list.length,
     count,
     avg: list.length ? round1(count / list.length) : 0,
-    max: sizes.length ? Math.max(...sizes) : null,
+    max: best ? tripMax(best) : null,
   };
 }
 
-// ★の多い順のランキング。type: 'jigheads' | 'worms' | 'ranges' | 'actions'
+// ★の多い順のランキング。type: 'jigheads' | 'worms' | 'ranges' | 'actions' | 'rigs' | 'tenya' | 'baits'
 // → [{ label, stars: ★の回数, used: 使った回数（★を含む） }]
 export function starRanking(trips, type) {
   const m = new Map();
   for (const t of trips) {
-    for (const it of t.aji?.[type] || []) {
+    for (const it of block(t)[type] || []) {
       const key = starKey(type, it);
       const r = m.get(key) || { label: starLabel(type, starItem(type, key)), stars: 0, used: 0 };
       r.used += 1;
@@ -47,8 +51,7 @@ export function starRanking(trips, type) {
 export function summarize(trips) {
   const totalCount = trips.reduce((s, t) => s + num(t.count), 0);
   const totalBare = trips.reduce((s, t) => s + num(t.bare), 0);
-  const withSize = trips.filter((t) => has(t.maxSize));
-  const maxTrip = withSize.reduce((b, t) => (!b || Number(t.maxSize) > Number(b.maxSize) ? t : b), null);
+  const maxTrip = trips.reduce((b, t) => (sizeScore(t) > (b ? sizeScore(b) : 0) ? t : b), null);
   const bestTrip = trips.reduce((b, t) => (num(t.count) > num(b?.count) ? t : b), null);
 
   // 港別（鮎日記の河川別と同じ形。river＝港名）
@@ -56,7 +59,7 @@ export function summarize(trips) {
     .map(([river, list]) => ({ river, ...rowOf(list) }))
     .sort((a, b) => b.trips - a.trips);
 
-  const bySide = [...group(trips, (t) => t.aji?.side)]
+  const bySide = [...group(trips, (t) => t.sea?.side)]
     .map(([side, list]) => ({ side, label: sideName(side), ...rowOf(list) }))
     .sort((a, b) => b.trips - a.trips);
 
@@ -64,7 +67,7 @@ export function summarize(trips) {
     .map(([month, list]) => ({ month, ...rowOf(list) }))
     .sort((a, b) => a.month - b.month);
 
-  const byShio = [...group(trips, (t) => t.aji?.tide?.shiomawari)]
+  const byShio = [...group(trips, (t) => t.sea?.tide?.shiomawari)]
     .map(([shio, list]) => ({ shio, ...rowOf(list) }))
     .sort((a, b) => SHIOMAWARI.indexOf(a.shio) - SHIOMAWARI.indexOf(b.shio));
 
@@ -72,16 +75,13 @@ export function summarize(trips) {
     tripCount: trips.length,
     totalCount,
     avgCount: trips.length ? round1(totalCount / trips.length) : 0,
-    maxSize: maxTrip ? Number(maxTrip.maxSize) : null,
+    maxSize: maxTrip ? tripMax(maxTrip) : null,
     maxTrip,
     bestTrip: bestTrip && num(bestTrip.count) > 0 ? bestTrip : null,
     totalBare,
     byRiver, bySide, byMonth, byShio,
-    stars: {
-      jigheads: starRanking(trips, 'jigheads'),
-      worms: starRanking(trips, 'worms'),
-      ranges: starRanking(trips, 'ranges'),
-      actions: starRanking(trips, 'actions'),
-    },
+    stars: Object.fromEntries(['jigheads', 'worms', 'rigs', 'tenya', 'baits', 'ranges', 'actions'].map((k) => [k, starRanking(trips, k)])),
+    // タチウオ：サイズごとの合計匹数
+    bySize: F_SIZES.map((f) => ({ size: f, count: trips.reduce((a, t) => a + (Number(t.tachiuo?.sizes?.[f]) || 0), 0) })).filter((r) => r.count),
   };
 }

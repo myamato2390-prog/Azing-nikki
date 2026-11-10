@@ -1,7 +1,9 @@
-import { TACKLE_FIELDS, seasonOf, num, has, starLabel, jigLabel, sideName } from './model.js';
+import { seasonOf, num, has, starLabel, jigLabel, sideName, kindName, block, formatSizes } from './model.js';
+
+const STAR_TYPES = ['jigheads', 'worms', 'ranges', 'actions', 'rigs', 'tenya', 'baits'];
 
 export function emptyQuery() {
-  return { text: '', river: '', side: '', season: '', from: '', to: '', shiomawari: '', light: '', jig: '', minCount: '' };
+  return { text: '', kind: '', river: '', side: '', season: '', from: '', to: '', shiomawari: '', light: '', jig: '', minCount: '' };
 }
 
 export function isEmptyQuery(q) {
@@ -9,19 +11,20 @@ export function isEmptyQuery(q) {
 }
 
 function haystack(t) {
-  const a = t.aji || {};
+  const a = t.sea || {}, b = block(t);
   return [
-    t.river, t.memo, t.title, t.weather, t.sizeFeel, sideName(a.side), a.light, a.windDir, a.tide?.shiomawari,
+    kindName(t.kind), t.river, t.memo, t.title, t.weather, t.sizeFeel, sideName(a.side), a.light, a.windDir, a.tide?.shiomawari,
     ...(t.moves || []).flatMap((m) => [m.river, m.point]),
-    ...TACKLE_FIELDS.map(([k]) => a.tackle?.[k]),
-    ...(t.jiai || []), ...(a.tideStages || []), ...(a.bycatch || []),
-    ...['jigheads', 'worms', 'ranges', 'actions'].flatMap((k) => (a[k] || []).map((x) => starLabel(k, x))),
+    ...Object.values(b.tackle || {}),
+    ...(t.jiai || []), ...(b.tideStages || []), ...(b.bycatch || []), formatSizes(b.sizes),
+    ...STAR_TYPES.flatMap((k) => (b[k] || []).map((x) => starLabel(k, x))),
   ].filter(Boolean).join('\n').toLowerCase();
 }
 
 export function matchTrip(t, q) {
   if (isEmptyQuery(q)) return true;
-  const a = t.aji || {};
+  const a = t.sea || {}, b = block(t);
+  if (q.kind && t.kind !== q.kind) return false;
   // 途中で移動した港も対象にする
   if (q.river && t.river !== q.river && !(t.moves || []).some((m) => m.river === q.river)) return false;
   if (q.side && a.side !== q.side) return false;
@@ -30,7 +33,7 @@ export function matchTrip(t, q) {
   if (q.to && (t.date || '') > q.to) return false;
   if (q.shiomawari && a.tide?.shiomawari !== q.shiomawari) return false;
   if (q.light && a.light !== q.light) return false;
-  if (has(q.jig) && !(a.jigheads || []).some((j) => Number(j.g) === Number(q.jig))) return false;
+  if (has(q.jig) && ![...(b.jigheads || []), ...(b.tenya || [])].some((j) => Number(j.g) === Number(q.jig))) return false;
   if (has(q.minCount) && num(t.count) < Number(q.minCount)) return false;
   if (q.text) {
     const h = haystack(t);
@@ -45,6 +48,7 @@ export const filterTrips = (trips, q) => trips.filter((t) => matchTrip(t, q));
 
 export function describeQuery(q) {
   const p = [];
+  if (q.kind) p.push(kindName(q.kind));
   if (q.season) p.push(`${q.season}年`);
   if (q.river) p.push(q.river);
   if (q.side) p.push(sideName(q.side));

@@ -1,7 +1,7 @@
 // カードを画像（PNG）にしてLINEなどへ共有する
 import {
   formatDate, formatWeather, formatDayTemps, formatWind, formatHighs, formatLows, formatTimeRange,
-  has, formatMoves, THEME_COLOR, sideName, starText, tackleSummary,
+  has, formatMoves, THEME_COLOR, sideName, starText, tackleSummary, kindName, KIND_COLOR, formatSizes, maxF, block,
 } from './model.js';
 
 const W = 1080, PAD = 56;
@@ -44,16 +44,20 @@ function draw(ctx, t, photo, measureOnly, color) {
     lines.forEach((l, i) => { if (i) y += 44; text(l, PAD + 230, 32); });
   };
 
-  // ヘッダー帯（港の色）
-  const a = t.aji;
+  // ヘッダー帯（釣り物の色：アジ＝金、タチウオ＝銀）。左のふちに港の色
+  const a = t.sea, b = block(t), tachi = t.kind === 'tachiuo';
+  const ink = '#0f2a44';
   const moves = formatMoves(t);
   const headH = 250 + moves.length * 46 + (t.title ? 60 : 0);
-  if (!measureOnly) { ctx.fillStyle = color; ctx.fillRect(0, 0, W, headH); }
-  y = 86; text(formatDate(t.date), PAD, 44, '#fff', 700);
-  y += 74; text(t.river || '港未入力', PAD, 58, '#fff', 800);
-  y += 56; text([sideName(a.side), formatTimeRange(t)].filter(Boolean).join('　'), PAD, 34, '#eaf3fa');
-  for (const mv of moves) { y += 46; text(`→ ${mv}`, PAD, 30, '#eaf3fa'); }
-  if (t.title) { y += 60; text(`「${t.title}」`, PAD, 36, '#fff', 700); }
+  if (!measureOnly) {
+    ctx.fillStyle = KIND_COLOR[t.kind] || KIND_COLOR.aji; ctx.fillRect(0, 0, W, headH);
+    ctx.fillStyle = color; ctx.fillRect(0, 0, 18, headH);
+  }
+  y = 86; text(`${formatDate(t.date)}　${kindName(t.kind)}`, PAD, 44, ink, 700);
+  y += 74; text(t.river || '港未入力', PAD, 58, ink, 800);
+  y += 56; text([sideName(a.side), formatTimeRange(t)].filter(Boolean).join('　'), PAD, 34, ink);
+  for (const mv of moves) { y += 46; text(`→ ${mv}`, PAD, 30, ink); }
+  if (t.title) { y += 60; text(`「${t.title}」`, PAD, 36, ink, 700); }
   y = headH;
 
   // 釣果
@@ -62,17 +66,23 @@ function draw(ctx, t, photo, measureOnly, color) {
   ctx.font = `800 110px ${FONT}`;
   const cw = ctx.measureText(has(t.count) ? `${t.count}` : '-').width;
   text('匹', PAD + cw + 10, 44, color, 700);
-  text(has(t.maxSize) ? `最大 ${t.maxSize}cm` : '', W - PAD, 48, C.text, 700, 'right');
+  text(tachi ? (maxF(b.sizes) ? `最大 ${maxF(b.sizes)}` : '') : has(t.maxSize) ? `最大 ${t.maxSize}cm` : '', W - PAD, 48, C.text, 700, 'right');
   y += 54;
-  const sub = [has(t.bare) ? `バラシ ${t.bare}` : '', t.sizeFeel].filter(Boolean).join('　');
+  const sub = [has(t.bare) ? `バラシ ${t.bare}` : '', tachi ? '' : t.sizeFeel].filter(Boolean).join('　');
   text(sub, W - PAD, 32, C.sub, 400, 'right');
   if (!measureOnly) { ctx.fillStyle = C.accent; ctx.fillRect(PAD, y + 10, 120, 8); }
   y += 10;
-  row('時合', [...(t.jiai || []), ...a.tideStages].join('・'));
-  row('ジグヘッド', starText(a.jigheads, 'jigheads'));
-  row('ワーム', starText(a.worms, 'worms'));
-  row('レンジ・誘い', [starText(a.ranges, 'ranges'), starText(a.actions, 'actions')].filter(Boolean).join('　'));
-  row('外道', a.bycatch.join('・'));
+  if (tachi) row('サイズ', formatSizes(b.sizes));
+  row('時合', [...(t.jiai || []), ...b.tideStages].join('・'));
+  if (tachi) {
+    row('仕掛け', [starText(b.rigs, 'rigs'), starText(b.tenya, 'tenya')].filter(Boolean).join('　'));
+    row('餌', starText(b.baits, 'baits'));
+  } else {
+    row('ジグヘッド', starText(b.jigheads, 'jigheads'));
+    row('ワーム', starText(b.worms, 'worms'));
+  }
+  row('レンジ・誘い', [starText(b.ranges, 'ranges'), starText(b.actions, 'actions')].filter(Boolean).join('　'));
+  if (!tachi) row('外道', b.bycatch.join('・'));
 
   const tide = [a.tide.shiomawari, formatHighs(t) ? `満潮 ${formatHighs(t)}` : '', formatLows(t) ? `干潮 ${formatLows(t)}` : ''].filter(Boolean).join('　');
   const weather = [formatWeather(t), formatWind(t)].filter(Boolean).join('　');
@@ -85,7 +95,7 @@ function draw(ctx, t, photo, measureOnly, color) {
     row('常夜灯', a.light);
   }
 
-  if (tackleSummary(a.tackle)) { section('仕掛け'); row('仕掛け', tackleSummary(a.tackle)); }
+  if (tackleSummary(b.tackle)) { section('タックル'); row('タックル', tackleSummary(b.tackle)); }
 
   if (t.memo) {
     section('メモ');
@@ -120,17 +130,17 @@ export async function renderCardImage(t, color = THEME_COLOR) {
 
 // ---------- シーズンまとめ画像 ----------
 // s: stats.summarize() の結果、colorOf: 河川名 → 色
-export async function renderSeasonImage(year, s, colorOf) {
+export async function renderSeasonImage(year, s, colorOf, kind = 'aji') {
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
   canvas.width = W;
-  const h = drawSeason(ctx, year, s, colorOf, true);
+  const h = drawSeason(ctx, year, s, colorOf, true, kind);
   canvas.height = h;
-  drawSeason(ctx, year, s, colorOf, false);
+  drawSeason(ctx, year, s, colorOf, false, kind);
   return new Promise((res) => canvas.toBlob(res, 'image/png'));
 }
 
-function drawSeason(ctx, year, s, colorOf, measureOnly) {
+function drawSeason(ctx, year, s, colorOf, measureOnly, kind = 'aji') {
   const main = colorOf(s.byRiver[0]?.river);
   let y = 0;
   const text = (str, x, size, color = C.text, weight = 400, align = 'left') => {
@@ -142,12 +152,12 @@ function drawSeason(ctx, year, s, colorOf, measureOnly) {
     ctx.fillStyle = main; ctx.fillRect(0, 0, W, 210);
   }
   y = 92; text(`${year}年のまとめ`, PAD, 64, '#fff', 800);
-  y = 160; text('お豆日記 アジングの記録', PAD, 32, '#eaf3fa', 500);
+  y = 160; text(`お豆日記 ${kindName(kind)}の記録`, PAD, 32, '#eaf3fa', 500);
 
   // 数字のマス（3列×2段）
   const tiles = [
     ['釣行', s.tripCount, '回'], ['総匹数', s.totalCount, '匹'], ['平均', s.avgCount, '匹/回'],
-    ['最大', s.maxSize ?? '-', 'cm'], ['最多', s.bestTrip ? s.bestTrip.count : '-', '匹'], ['バラシ', s.totalBare, '回'],
+    ['最大', s.maxSize ?? '-', kind === 'tachiuo' ? '' : 'cm'], ['最多', s.bestTrip ? s.bestTrip.count : '-', '匹'], ['バラシ', s.totalBare, '回'],
   ];
   const tw = (W - PAD * 2 - 24 * 2) / 3, th = 170;
   tiles.forEach(([label, v, unit], i) => {
@@ -160,7 +170,7 @@ function drawSeason(ctx, year, s, colorOf, measureOnly) {
   y = 250 + th * 2 + 24 + 30;
 
   const bests = [];
-  if (s.maxTrip) bests.push(`🏆 最大 ${s.maxTrip.maxSize}cm　${formatDate(s.maxTrip.date)} ${s.maxTrip.river}`);
+  if (s.maxTrip) bests.push(`🏆 最大 ${s.maxSize}${kind === 'tachiuo' ? '' : 'cm'}　${formatDate(s.maxTrip.date)} ${s.maxTrip.river}`);
   if (s.bestTrip) bests.push(`🏆 最多 ${s.bestTrip.count}匹　${formatDate(s.bestTrip.date)} ${s.bestTrip.river}`);
   for (const b of bests) { y += 56; text(b, PAD, 32, C.text, 600); }
 
@@ -198,16 +208,18 @@ export async function shareBlob(blob, name, text) {
 }
 
 export function shareText(t) {
-  const L = [`【お豆日記】${formatDate(t.date)}`, t.river];
+  const L = [`【お豆日記】${formatDate(t.date)} ${kindName(t.kind)}`, t.river];
   if (t.title) L.push(`「${t.title}」`);
-  L.push(`釣果 ${has(t.count) ? t.count : '-'}匹${has(t.maxSize) ? ` / 最大${t.maxSize}cm` : ''}${has(t.bare) ? ` / バラシ${t.bare}` : ''}`);
-  if (t.aji.tide.shiomawari) L.push(t.aji.tide.shiomawari);
+  const mx = t.kind === 'tachiuo' ? maxF(t.tachiuo.sizes) : has(t.maxSize) ? `${t.maxSize}cm` : '';
+  L.push(`釣果 ${has(t.count) ? t.count : '-'}匹${mx ? ` / 最大${mx}` : ''}${has(t.bare) ? ` / バラシ${t.bare}` : ''}`);
+  if (t.kind === 'tachiuo' && formatSizes(t.tachiuo.sizes)) L.push(formatSizes(t.tachiuo.sizes));
+  if (t.sea.tide.shiomawari) L.push(t.sea.tide.shiomawari);
   return L.filter(Boolean).join('\n');
 }
 
 export async function shareTrip(t, color) {
   const blob = await renderCardImage(t, color);
-  const file = new File([blob], `お豆日記_${t.date}_${t.river || ''}.png`, { type: 'image/png' });
+  const file = new File([blob], `お豆日記_${t.date}_${kindName(t.kind)}_${t.river || ''}.png`, { type: 'image/png' });
   if (navigator.canShare?.({ files: [file] })) {
     try {
       await navigator.share({ files: [file], text: shareText(t) });

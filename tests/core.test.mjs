@@ -32,9 +32,10 @@ test('trip shape: common fields + kind + aji block', () => {
     'moves', 'title', 'count', 'maxSize', 'bare', 'sizeFeel', 'jiai', 'memo', 'photos', 'createdAt', 'updatedAt']) assert.ok(k in t, k);
   // 鮎専用・費用の項目は持たない
   for (const k of ['levelCm', 'aka', 'otori', 'ticket', 'otherCost', 'tackle']) assert.equal(k in t, false, k);
-  const n = normalizeTrip({ date: '2026-01-01', aji: { tide: { shiomawari: '大潮' } } });
+  const n = normalizeTrip({ date: '2026-01-01', sea: { tide: { shiomawari: '大潮' } } });
   assert.equal(n.kind, 'aji');
-  assert.deepEqual(n.aji.tide.highs, []);
+  assert.deepEqual(n.sea.tide.highs, []);
+  assert.equal(n.sea.tide.shiomawari, '大潮');
   assert.equal(n.aji.tackle.rod, '');
   assert.deepEqual(n.aji.jigheads, []);
   assert.equal(DEFAULT_PLACES.length, 13);
@@ -46,9 +47,9 @@ test('model helpers', () => {
   assert.deepEqual(sortTrips(trips).map((t) => t.date), ['2025-11-03', '2026-06-01', '2026-10-12', '2026-10-20']);
   assert.equal(addDays('2026-12-31', 1), '2027-01-01');
   assert.equal(tackleSummary(trips[0].aji.tackle), 'エステル 0.3号');
-  assert.equal(formatWeather({ weather: '晴れ', aji: { tempStart: 14.2 } }), '晴れ 14.2℃');
-  assert.equal(formatWind({ aji: { windDir: '北西', windSpeed: 3.2, windMax: 6 } }), '北西 3.2m/s（最大6）');
-  assert.equal(formatHighs({ aji: { tide: { highs: [{ time: '19:42', cm: 312 }, { time: '07:50', cm: null, nextDay: true }] } } }), '19:42(312cm)・翌07:50');
+  assert.equal(formatWeather({ weather: '晴れ', sea: { tempStart: 14.2 } }), '晴れ 14.2℃');
+  assert.equal(formatWind({ sea: { windDir: '北西', windSpeed: 3.2, windMax: 6 } }), '北西 3.2m/s（最大6）');
+  assert.equal(formatHighs({ sea: { tide: { highs: [{ time: '19:42', cm: 312 }, { time: '07:50', cm: null, nextDay: true }] } } }), '19:42(312cm)・翌07:50');
 });
 
 test('time, night trips & moves', () => {
