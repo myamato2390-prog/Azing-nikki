@@ -4,11 +4,12 @@ import { num, has, sortTrips } from './model.js';
 const round1 = (n) => Math.round(n * 10) / 10;
 const month = (t) => Number((t.date || '').slice(5, 7)) || null;
 const done = (t) => has(t.count); // 釣行後まで入力済み
+const minutes = (s) => (s ? Number(s.slice(0, 2)) * 60 + Number(s.slice(3, 5)) : null);
 
-// 同じ河川・同じポイントの成績
-export function pointStats(trips, river, point) {
-  if (!river || !point) return null;
-  const list = trips.filter((t) => done(t) && t.river === river && t.point === point);
+// 同じ港の成績
+export function placeStats(trips, river) {
+  if (!river) return null;
+  const list = trips.filter((t) => done(t) && t.river === river);
   if (!list.length) return null;
   const counts = list.map((t) => num(t.count));
   const sizes = list.map((t) => t.maxSize).filter(has).map(Number);
@@ -24,22 +25,27 @@ export function pointStats(trips, river, point) {
 export function similarity(t, cond) {
   let score = 0;
   const why = [];
-  if (cond.point && t.point === cond.point) { score += 3; why.push('同じポイント'); }
-  if (has(cond.levelCm) && has(t.levelCm) && (t.station || '') === (cond.station || '')) {
-    const d = Math.abs(Number(t.levelCm) - Number(cond.levelCm));
-    if (d <= 5) { score += 3; why.push('水位±5cm'); } else if (d <= 10) { score += 2; why.push('水位±10cm'); } else if (d <= 20) { score += 1; why.push('水位±20cm'); }
-  } else if (cond.levelWord && t.levelWord === cond.levelWord) { score += 2; why.push(`水位${t.levelWord}`); }
-  if (cond.clarity && t.clarity === cond.clarity) { score += 1; why.push(t.clarity); }
-  if (cond.aka && t.aka === cond.aka) { score += 1; why.push(`垢${t.aka}`); }
+  const a = t.aji || {}, c = cond.aji || {};
+  if (cond.river && t.river === cond.river) { score += 3; why.push('同じ港'); }
+  if (c.tide?.shiomawari && a.tide?.shiomawari === c.tide.shiomawari) { score += 2; why.push(a.tide.shiomawari); }
+  if (c.light && a.light === c.light) { score += 1; why.push(`常夜灯${a.light}`); }
+  if (c.windDir && a.windDir === c.windDir) { score += 1; why.push(`${a.windDir}の風`); }
+  if (has(c.windSpeed) && has(a.windSpeed) && Math.abs(Number(a.windSpeed) - Number(c.windSpeed)) <= 2) { score += 1; why.push('風速が近い'); }
+  const s1 = minutes(t.startTime), s2 = minutes(cond.startTime);
+  if (s1 !== null && s2 !== null) {
+    const d = Math.abs(s1 - s2);
+    if (Math.min(d, 1440 - d) <= 60) { score += 1; why.push('同じ時間帯'); }
+  }
   if (cond.date && month(t) === month(cond)) { score += 1; why.push(`${month(t)}月`); }
   return { score, why };
 }
 
-// 作戦ボード：同じ河川で条件が近い過去の釣行
+// 作戦ボード：同じ港、または同じ側の港で条件が近い過去の釣行
 export function similarTrips(trips, cond, excludeId, n = 3) {
   if (!cond.river) return [];
+  const side = cond.aji?.side;
   return trips
-    .filter((t) => t.id !== excludeId && done(t) && t.river === cond.river)
+    .filter((t) => t.id !== excludeId && done(t) && (t.river === cond.river || (side && t.aji?.side === side)))
     .map((t) => ({ trip: t, ...similarity(t, cond) }))
     .sort((a, b) => b.score - a.score || num(b.trip.count) - num(a.trip.count) || (b.trip.date || '').localeCompare(a.trip.date || ''))
     .slice(0, n);

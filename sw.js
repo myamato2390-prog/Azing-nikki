@@ -3,7 +3,7 @@ const VERSION = 'aji-nikki-v0.1.0';
 const FILES = [
   './', './index.html', './manifest.webmanifest', './css/style.css',
   './js/app.js', './js/db.js', './js/model.js', './js/search.js', './js/stats.js',
-  './js/xlsx.js', './js/export.js', './js/share.js', './js/insights.js', './js/weather.js',
+  './js/xlsx.js', './js/export.js', './js/share.js', './js/insights.js', './js/weather.js', './js/tide.js',
   './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png',
 ];
 

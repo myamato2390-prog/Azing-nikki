@@ -1,8 +1,11 @@
 // カードを画像（PNG）にしてLINEなどへ共有する
-import { formatDate, formatLevel, formatWeather, has, TACKLE_FIELDS, formatMoves, THEME_COLOR } from './model.js';
+import {
+  formatDate, formatWeather, formatDayTemps, formatWind, formatHighs, formatLows, formatTimeRange,
+  has, formatMoves, THEME_COLOR, sideName, starText, tackleSummary,
+} from './model.js';
 
 const W = 1080, PAD = 56;
-const C = { bg: '#f4f7f5', card: '#ffffff', main: '#0f5f57', sub: '#5b6b66', text: '#1d2a27', accent: '#e3b400', line: '#dfe7e4' };
+const C = { bg: '#eef3f7', card: '#ffffff', main: '#1f6f9f', sub: '#5a6b7b', text: '#16263a', accent: '#f2c14e', line: '#dde6ee' };
 const FONT = '"Noto Sans JP","Noto Sans CJK JP","Hiragino Sans",sans-serif';
 
 function wrap(ctx, text, maxW) {
@@ -41,16 +44,15 @@ function draw(ctx, t, photo, measureOnly, color) {
     lines.forEach((l, i) => { if (i) y += 44; text(l, PAD + 230, 32); });
   };
 
-  // ヘッダー帯（河川の色）
+  // ヘッダー帯（港の色）
+  const a = t.aji;
   const moves = formatMoves(t);
   const headH = 250 + moves.length * 46 + (t.title ? 60 : 0);
   if (!measureOnly) { ctx.fillStyle = color; ctx.fillRect(0, 0, W, headH); }
   y = 86; text(formatDate(t.date), PAD, 44, '#fff', 700);
-  y += 74; text(t.river || '河川未入力', PAD, 58, '#fff', 800);
-  ctx.font = `400 34px ${FONT}`;
-  const pt = t.point ? wrap(ctx, t.point, W - PAD * 2)[0] : '';
-  y += 56; text(pt, PAD, 34, '#eef7f4');
-  for (const mv of moves) { y += 46; text(`→ ${mv}`, PAD, 30, '#eef7f4'); }
+  y += 74; text(t.river || '港未入力', PAD, 58, '#fff', 800);
+  y += 56; text([sideName(a.side), formatTimeRange(t)].filter(Boolean).join('　'), PAD, 34, '#eaf3fa');
+  for (const mv of moves) { y += 46; text(`→ ${mv}`, PAD, 30, '#eaf3fa'); }
   if (t.title) { y += 60; text(`「${t.title}」`, PAD, 36, '#fff', 700); }
   y = headH;
 
@@ -66,18 +68,24 @@ function draw(ctx, t, photo, measureOnly, color) {
   text(sub, W - PAD, 32, C.sub, 400, 'right');
   if (!measureOnly) { ctx.fillStyle = C.accent; ctx.fillRect(PAD, y + 10, 120, 8); }
   y += 10;
-  row('時合', (t.jiai || []).join('・'));
-  row('釣れた場所', [(t.spots || []).join('・'), t.spotsNote].filter(Boolean).join('　'));
-  row('釣り方', (t.methods || []).join('・'));
-  row('時間', [t.startTime, t.endTime].some(Boolean) ? `${t.startTime || '?'}〜${t.endTime || '?'}` : '');
+  row('時合', [...(t.jiai || []), ...a.tideStages].join('・'));
+  row('ジグヘッド', starText(a.jigheads, 'jigheads'));
+  row('ワーム', starText(a.worms, 'worms'));
+  row('レンジ・誘い', [starText(a.ranges, 'ranges'), starText(a.actions, 'actions')].filter(Boolean).join('　'));
+  row('外道', a.bycatch.join('・'));
 
-  section('状況');
-  row('天気', [formatWeather(t), has(t.waterTemp) ? `水温${t.waterTemp}℃` : ''].filter(Boolean).join('　'));
-  row('水位', formatLevel(t));
-  row('濁り・垢', [t.clarity, t.aka ? `垢：${t.aka}` : ''].filter(Boolean).join('　'));
+  const tide = [a.tide.shiomawari, formatHighs(t) ? `満潮 ${formatHighs(t)}` : '', formatLows(t) ? `干潮 ${formatLows(t)}` : ''].filter(Boolean).join('　');
+  const weather = [formatWeather(t), formatWind(t)].filter(Boolean).join('　');
+  const temps = [formatDayTemps(t), has(t.waterTemp) ? `水温${t.waterTemp}℃` : ''].filter(Boolean).join('　');
+  if (tide || weather || temps || a.light) {
+    section('状況');
+    row('潮', tide);
+    row('天気・風', weather);
+    row('気温', temps);
+    row('常夜灯', a.light);
+  }
 
-  const tk = TACKLE_FIELDS.filter(([k]) => t.tackle?.[k]);
-  if (tk.length) { section('仕掛け'); tk.forEach(([k, label]) => row(label, t.tackle[k])); }
+  if (tackleSummary(a.tackle)) { section('仕掛け'); row('仕掛け', tackleSummary(a.tackle)); }
 
   if (t.memo) {
     section('メモ');
@@ -133,8 +141,8 @@ function drawSeason(ctx, year, s, colorOf, measureOnly) {
     ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, ctx.canvas.height);
     ctx.fillStyle = main; ctx.fillRect(0, 0, W, 210);
   }
-  y = 92; text(`${year} シーズン`, PAD, 64, '#fff', 800);
-  y = 160; text('アジ日記 アジングの記録', PAD, 32, '#eef7f4', 500);
+  y = 92; text(`${year}年のまとめ`, PAD, 64, '#fff', 800);
+  y = 160; text('アジ日記 アジングの記録', PAD, 32, '#eaf3fa', 500);
 
   // 数字のマス（3列×2段）
   const tiles = [
@@ -170,7 +178,7 @@ function drawSeason(ctx, year, s, colorOf, measureOnly) {
       text(`${r.count}匹`, PAD + labelW + bw + 14, 28, C.sub, 600);
     }
   };
-  bars('河川別の釣果', s.byRiver.map((r) => ({ label: r.river, count: r.count, river: r.river })), (r) => colorOf(r.river));
+  bars('港別の釣果', s.byRiver.map((r) => ({ label: r.river, count: r.count, river: r.river })), (r) => colorOf(r.river));
   bars('月別の釣果', s.byMonth.map((r) => ({ label: `${r.month}月`, count: r.count })), () => main);
   return y + PAD + 20;
 }
@@ -190,12 +198,11 @@ export async function shareBlob(blob, name, text) {
 }
 
 export function shareText(t) {
-  const L = [`【アジ日記】${formatDate(t.date)}`, `${t.river}${t.point ? ' ' + t.point : ''}`];
+  const L = [`【アジ日記】${formatDate(t.date)}`, t.river];
   if (t.title) L.push(`「${t.title}」`);
   L.push(`釣果 ${has(t.count) ? t.count : '-'}匹${has(t.maxSize) ? ` / 最大${t.maxSize}cm` : ''}${has(t.bare) ? ` / バラシ${t.bare}` : ''}`);
-  const lv = formatLevel(t);
-  if (lv) L.push(`水位 ${lv}`);
-  return L.join('\n');
+  if (t.aji.tide.shiomawari) L.push(t.aji.tide.shiomawari);
+  return L.filter(Boolean).join('\n');
 }
 
 export async function shareTrip(t, color) {

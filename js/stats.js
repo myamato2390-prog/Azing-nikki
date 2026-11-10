@@ -1,4 +1,4 @@
-import { num, has, tripCost, seasonOf } from './model.js';
+import { num, has, seasonOf, sideName, starKey, starItem, starLabel, SHIOMAWARI } from './model.js';
 
 export function seasons(trips) {
   return [...new Set(trips.map(seasonOf).filter(Boolean))].sort((a, b) => b - a);
@@ -28,39 +28,45 @@ function rowOf(list) {
   };
 }
 
-// 水位(cm)を10cm刻みに分ける。例: -15 → "-20〜-11cm"
-export function levelBucket(cm) {
-  const b = Math.floor(Number(cm) / 10) * 10;
-  const f = (n) => (n > 0 ? `+${n}` : `${n}`);
-  return { key: b, label: `${f(b)}〜${f(b + 9)}cm` };
+// ★の多い順のランキング。type: 'jigheads' | 'worms' | 'ranges' | 'actions'
+// → [{ label, stars: ★の回数, used: 使った回数（★を含む） }]
+export function starRanking(trips, type) {
+  const m = new Map();
+  for (const t of trips) {
+    for (const it of t.aji?.[type] || []) {
+      const key = starKey(type, it);
+      const r = m.get(key) || { label: starLabel(type, starItem(type, key)), stars: 0, used: 0 };
+      r.used += 1;
+      if (it.star) r.stars += 1;
+      m.set(key, r);
+    }
+  }
+  return [...m.values()].sort((a, b) => b.stars - a.stars || b.used - a.used || a.label.localeCompare(b.label, 'ja'));
 }
 
 export function summarize(trips) {
   const totalCount = trips.reduce((s, t) => s + num(t.count), 0);
   const totalBare = trips.reduce((s, t) => s + num(t.bare), 0);
-  const totalCost = trips.reduce((s, t) => s + tripCost(t), 0);
   const withSize = trips.filter((t) => has(t.maxSize));
   const maxTrip = withSize.reduce((b, t) => (!b || Number(t.maxSize) > Number(b.maxSize) ? t : b), null);
   const bestTrip = trips.reduce((b, t) => (num(t.count) > num(b?.count) ? t : b), null);
 
-  const byRiver = [...group(trips, (t) => t.river || '（河川未入力）')]
+  // 港別（鮎日記の河川別と同じ形。river＝港名）
+  const byRiver = [...group(trips, (t) => t.river || '（港未入力）')]
     .map(([river, list]) => ({ river, ...rowOf(list) }))
+    .sort((a, b) => b.trips - a.trips);
+
+  const bySide = [...group(trips, (t) => t.aji?.side)]
+    .map(([side, list]) => ({ side, label: sideName(side), ...rowOf(list) }))
     .sort((a, b) => b.trips - a.trips);
 
   const byMonth = [...group(trips, (t) => Number((t.date || '').slice(5, 7)) || null)]
     .map(([month, list]) => ({ month, ...rowOf(list) }))
     .sort((a, b) => a.month - b.month);
 
-  // 水位は観測所ごとに比較しないと意味がないので、河川＋観測所で分ける
-  const byLevel = [];
-  const byStation = group(trips.filter((t) => has(t.levelCm)), (t) => `${t.river || '?'}\u0000${t.station || ''}`);
-  for (const [k, list] of byStation) {
-    const [river, station] = k.split('\u0000');
-    const buckets = group(list, (t) => levelBucket(t.levelCm).key);
-    for (const [key, bl] of [...buckets].sort((a, b) => a[0] - b[0])) {
-      byLevel.push({ river, station, range: levelBucket(key).label, ...rowOf(bl) });
-    }
-  }
+  const byShio = [...group(trips, (t) => t.aji?.tide?.shiomawari)]
+    .map(([shio, list]) => ({ shio, ...rowOf(list) }))
+    .sort((a, b) => SHIOMAWARI.indexOf(a.shio) - SHIOMAWARI.indexOf(b.shio));
 
   return {
     tripCount: trips.length,
@@ -70,8 +76,12 @@ export function summarize(trips) {
     maxTrip,
     bestTrip: bestTrip && num(bestTrip.count) > 0 ? bestTrip : null,
     totalBare,
-    totalCost,
-    costPerFish: totalCount ? Math.round(totalCost / totalCount) : null,
-    byRiver, byMonth, byLevel,
+    byRiver, bySide, byMonth, byShio,
+    stars: {
+      jigheads: starRanking(trips, 'jigheads'),
+      worms: starRanking(trips, 'worms'),
+      ranges: starRanking(trips, 'ranges'),
+      actions: starRanking(trips, 'actions'),
+    },
   };
 }
