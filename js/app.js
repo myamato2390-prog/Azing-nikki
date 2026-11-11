@@ -1495,6 +1495,8 @@ function viewSettings() {
       <h3>仲間とカードのやりとり</h3>
       <p class="muted">自分のカードをファイルにして LINE で送ったり、仲間からもらったカードを読み込んだりできます。もらったカードは「◯◯さんのカード」として入り、直すことはできません。まとめ・作戦ボード・港の過去成績に入れるかどうかを選べます（自己ベストは自分のカードだけで決めます）。</p>
       <div class="send-box">
+        ${field('あなたの名前（カードをあげると、相手のアプリに「◯◯さんのカード」と出ます）', `<input id="my-name" value="${esc(state.myName)}" placeholder="例: たろう" maxlength="20">`)}
+        ${state.myName ? '' : '<p class="muted name-hint">まだ名前が入っていません。カードをあげる前に入れてください。</p>'}
         <div class="row2">
           ${field('年', `<select id="send-year"><option value="">すべて</option>${seasons(mine()).map((y) => `<option value="${y}">${y}年</option>`).join('')}</select>`)}
           ${field('釣り物', `<select id="send-kind"><option value="">両方</option>${KINDS.map((k) => `<option value="${k}">${kindName(k)}</option>`).join('')}</select>`)}
@@ -1561,7 +1563,14 @@ function viewSettings() {
     if (c) c.textContent = state.trips.length;
   };
 
-  root.addEventListener('input', (e) => {
+  root.addEventListener('input', async (e) => {
+    if (e.target.id === 'my-name') {
+      state.myName = e.target.value.trim();
+      await db.setKV('myName', state.myName);
+      const hint = $('.name-hint', root);
+      if (hint) hint.hidden = !!state.myName;
+      return;
+    }
     const el = e.target.closest('[data-rf]');
     if (!el) return;
     const item = el.closest('.river-item');
