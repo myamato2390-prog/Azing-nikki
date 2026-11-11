@@ -16,7 +16,7 @@ import { placeStats, similarTrips, personalBests, recordBadges, newRecords } fro
 import { fetchWeather } from './weather.js';
 import { shiomawari, tideForTrip } from './tide.js';
 
-const APP_VERSION = '0.3.2';
+const APP_VERSION = '0.3.3';
 
 const state = {
   trips: [],
@@ -233,6 +233,19 @@ function bindControls(root, obj, onChange) {
 }
 
 // ---------- 写真の拡大表示 ----------
+// メモ全体を大きく表示する（カードには3行だけ出す）
+function showMemo(t) {
+  const ov = document.createElement('div');
+  ov.className = 'memo-overlay';
+  ov.innerHTML = `<div class="memo-sheet" role="dialog" aria-label="メモ">
+      <div class="memo-sheet-head"><span>${formatDate(t.date)} ${esc(t.river || '')}　${esc(kindName(t.kind))}のメモ</span>
+        <button type="button" class="memo-close" aria-label="閉じる">×</button></div>
+      <div class="memo-sheet-body">${esc(t.memo)}</div>
+    </div>`;
+  ov.addEventListener('click', (e) => { if (e.target === ov || e.target.closest('.memo-close')) ov.remove(); });
+  document.body.appendChild(ov);
+}
+
 function showPhoto(src) {
   const ov = document.createElement('div');
   ov.className = 'photo-overlay';
@@ -308,7 +321,7 @@ function cardHtml(t) {
       ${cell('水温', has(t.waterTemp) ? `${esc(t.waterTemp)}℃` : '')}
       ${cell('タックル', esc(tackle), 'wide')}
     </section>
-    ${t.memo ? `<section class="memo" data-act="memo">${esc(t.memo)}</section>` : ''}
+    ${t.memo ? `<section class="memo" data-act="memo" data-id="${t.id}"><div class="memo-text">${esc(t.memo)}</div><div class="memo-more" hidden>▼ 続きを読む</div></section>` : ''}
     ${t.photos?.length ? `<section class="strip">${t.photos.map((p) => `<img data-src="${p.data}" alt="写真" data-act="photo">`).join('')}</section>` : ''}
   </article>`;
 }
@@ -349,7 +362,7 @@ function viewCards() {
     const el = e.target.closest('[data-act]');
     const act = el?.dataset.act;
     if (act === 'clear-search') { state.query = emptyQuery(); viewCards(); }
-    else if (act === 'memo') el.classList.toggle('open');
+    else if (act === 'memo') { const t = state.trips.find((x) => x.id === el.dataset.id); if (t) showMemo(t); }
     else if (act === 'photo' && el.src) showPhoto(el.src);
   });
   $('#edit-btn').onclick = () => { if (state.currentId) location.hash = `#/edit/${state.currentId}`; };
@@ -374,6 +387,9 @@ function viewCards() {
     [...deck.children].forEach((card, j) => {
       if (Math.abs(j - i) > 1) return;
       $$('img[data-src]', card).forEach((img) => { img.src = img.dataset.src; img.removeAttribute('data-src'); });
+      // メモが3行に収まらないときだけ「続きを読む」を出す
+      const mt = $('.memo-text', card);
+      if (mt) $('.memo-more', card).hidden = mt.scrollHeight <= mt.clientHeight + 2;
       const head = $('.card-head[data-bg]', card);
       if (head) { head.style.backgroundImage = `linear-gradient(rgba(0,0,0,.25),rgba(0,0,0,.55)),url("${head.dataset.bg}")`; head.removeAttribute('data-bg'); }
     });

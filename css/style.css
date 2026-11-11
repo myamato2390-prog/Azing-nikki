@@ -179,10 +179,20 @@ select.btn { appearance: none; padding-right: 12px; }
 .grid.tackle { background: color-mix(in srgb, var(--river) 5%, var(--card)) !important; }
 .mini-link { text-decoration: none; font-weight: 700; padding: 0 4px; }
 .memo {
-  padding: 8px 14px; white-space: pre-wrap; border-top: 1px solid var(--line);
-  display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer;
+  padding: 8px 14px; border-top: 1px solid var(--line); cursor: pointer;
 }
-.memo.open { display: block; }
+/* 3行で切る（切った行の下に次の行が半分見えないよう、余白は外側の .memo に付ける） */
+.memo-text {
+  white-space: pre-wrap; word-break: break-word; line-height: 1.45;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; max-height: calc(1.45em * 3);
+}
+.memo-more { margin-top: 2px; font-size: 13px; font-weight: 700; color: var(--main-text); }
+.memo-overlay { position: fixed; inset: 0; z-index: 35; background: rgba(0,0,0,.6); display: flex; align-items: flex-end; justify-content: center; animation: fade .15s; }
+.memo-sheet { width: 100%; max-width: 640px; max-height: 85dvh; background: var(--card); color: var(--text); border-radius: 18px 18px 0 0; display: flex; flex-direction: column; padding-bottom: var(--safe-b); }
+.memo-sheet-head { display: flex; align-items: center; gap: 8px; padding: 10px 10px 10px 16px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--sub); font-weight: 700; }
+.memo-sheet-head span { flex: 1; }
+.memo-close { width: 40px; height: 40px; border-radius: 50%; border: 0; background: var(--main-soft); color: var(--text); font-size: 22px; cursor: pointer; }
+.memo-sheet-body { padding: 14px 16px 24px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; font-size: 16px; line-height: 1.7; -webkit-overflow-scrolling: touch; }
 .strip { display: flex; gap: 6px; padding: 6px 14px; overflow-x: auto; border-top: 1px solid var(--line); }
 .strip img { width: 66px; height: 66px; object-fit: cover; border-radius: 8px; background: var(--line); flex: none; cursor: zoom-in; }
 .card > :last-child { border-radius: 0 0 14px 14px; }

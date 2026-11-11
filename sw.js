@@ -2,7 +2,7 @@
 // テスト版（/preview/）は名前を分け、本番・テスト版・鮎日記のキャッシュを互いに消さない
 const TEST = self.location.pathname.includes('/preview/');
 const PREFIX = TEST ? 'aji-nikki-test-v' : 'aji-nikki-v';
-const VERSION = `${PREFIX}0.3.2`;
+const VERSION = `${PREFIX}0.3.3`;
 const FILES = [
   './', './index.html', './manifest.webmanifest', './css/style.css',
   './js/app.js', './js/db.js', './js/model.js', './js/search.js', './js/stats.js',
