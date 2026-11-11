@@ -17,7 +17,7 @@ import { fetchWeather } from './weather.js';
 import { makeCardPack, checkCardPack, importCardPack, friendsOf, analysisTrips, ownTrips, isShared, sharedFrom } from './cards.js';
 import { shiomawari, tideForTrip } from './tide.js';
 
-const APP_VERSION = '0.4.0';
+const APP_VERSION = '0.4.1';
 
 const state = {
   trips: [],
@@ -109,6 +109,20 @@ function sendCardsSheet(list) {
 }
 
 // カードを集める：仲間からもらったファイルを読み込む
+// 共有で届いたファイル（Service Worker が置いたもの）を読み込む
+async function viewReceive() {
+  location.replace('#/');
+  const name = db.IS_TEST ? 'aji-nikki-test-share' : 'aji-nikki-share';
+  let cache, keys = [];
+  try { cache = await caches.open(name); keys = await cache.keys(); } catch { /* キャッシュが使えない */ }
+  if (!keys.length) return toast('共有されたファイルが見つかりませんでした。設定の「もらったカードを読み込む」から選んでください');
+  for (const k of keys) {
+    const res = await cache.match(k);
+    await cache.delete(k);
+    if (res) await receiveCards(res, () => route());
+  }
+}
+
 async function receiveCards(file, after) {
   let data;
   try { data = JSON.parse(await file.text()); } catch { return toast('ファイルを読めませんでした'); }
@@ -1501,6 +1515,7 @@ function viewSettings() {
           ${field('年', `<select id="send-year"><option value="">すべて</option>${seasons(mine()).map((y) => `<option value="${y}">${y}年</option>`).join('')}</select>`)}
           ${field('釣り物', `<select id="send-kind"><option value="">両方</option>${KINDS.map((k) => `<option value="${k}">${kindName(k)}</option>`).join('')}</select>`)}
         </div>
+        <p class="muted">LINEで届いたカードのファイルは、ファイルを開いて「共有」→「お豆日記」を選ぶと、そのまま読み込めます（ホーム画面に追加したお豆日記のときだけ）。</p>
         <div class="tools">
           <button type="button" class="btn" data-act="send-cards">📇 カードをあげる</button>
           <label class="btn"><input type="file" accept=".txt,.json,text/plain,application/json" hidden id="receive-cards">🤝 もらったカードを読み込む</label>
@@ -1730,6 +1745,7 @@ async function route() {
     case 'search': return viewSearch();
     case 'season': return viewSeason(parts[1], parts[2]);
     case 'settings': return viewSettings();
+    case 'receive': return viewReceive();
     default: return viewCards();
   }
 }
