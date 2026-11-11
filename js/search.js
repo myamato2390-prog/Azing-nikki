@@ -3,17 +3,20 @@ import { seasonOf, num, has, starLabel, jigLabel, sideName, kindName, block, for
 const STAR_TYPES = ['jigheads', 'worms', 'ranges', 'actions', 'rigs', 'tenya', 'baits'];
 
 export function emptyQuery() {
-  return { text: '', kind: '', river: '', side: '', season: '', from: '', to: '', shiomawari: '', light: '', jig: '', minCount: '' };
+  // who：'me'＝自分のカード（初期値）、'friends'＝仲間のカード、'all'＝全部
+  return { who: 'me', text: '', kind: '', river: '', side: '', season: '', from: '', to: '', shiomawari: '', light: '', jig: '', minCount: '' };
 }
 
+// 「自分のカード」だけのときは、条件なしとみなす
 export function isEmptyQuery(q) {
-  return !q || Object.values(q).every((v) => v === '' || v === null || v === undefined);
+  return !q || Object.entries(q).every(([k, v]) => (k === 'who' && v === 'me') || v === '' || v === null || v === undefined);
 }
+const shared = (t) => !!t.shared?.from;
 
 function haystack(t) {
   const a = t.sea || {}, b = block(t);
   return [
-    kindName(t.kind), t.river, t.memo, t.title, t.weather, t.sizeFeel, sideName(a.side), a.light, a.windDir, a.tide?.shiomawari,
+    kindName(t.kind), t.shared?.from, t.river, t.memo, t.title, t.weather, t.sizeFeel, sideName(a.side), a.light, a.windDir, a.tide?.shiomawari,
     ...(t.moves || []).flatMap((m) => [m.river, m.point]),
     ...Object.values(b.tackle || {}),
     ...(t.jiai || []), ...(b.tideStages || []), b.firstHit, ...(b.bycatch || []), formatSizes(b.sizes),
@@ -22,6 +25,8 @@ function haystack(t) {
 }
 
 export function matchTrip(t, q) {
+  if (q?.who === 'me' && shared(t)) return false;
+  if (q?.who === 'friends' && !shared(t)) return false;
   if (isEmptyQuery(q)) return true;
   const a = t.sea || {}, b = block(t);
   if (q.kind && t.kind !== q.kind) return false;
@@ -48,6 +53,8 @@ export const filterTrips = (trips, q) => trips.filter((t) => matchTrip(t, q));
 
 export function describeQuery(q) {
   const p = [];
+  if (q.who === 'friends') p.push('仲間のカード');
+  if (q.who === 'all') p.push('自分と仲間のカード');
   if (q.kind) p.push(kindName(q.kind));
   if (q.season) p.push(`${q.season}年`);
   if (q.river) p.push(q.river);

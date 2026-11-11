@@ -28,6 +28,7 @@ const HEAD_COLUMNS = [
   ['干潮', 20, (t) => formatLows(t)],
   ['常夜灯', 10, (t) => t.sea.light],
   ['両方の日', 8, (t) => (t.pairId ? '○' : '')],
+  ['だれのカード', 10, (t) => t.shared?.from || '自分'],
 ];
 const AJI_COLUMNS = [
   ['匹数', 6, (t) => n(t.count)],

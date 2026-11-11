@@ -391,3 +391,17 @@ body.is-test .top { top: 18px; }
 body.is-test #view { top: calc(var(--top-h) + 18px); }
 body.is-test .deck { height: calc(100dvh - var(--top-h) - var(--nav-h) - var(--safe-b) - 38px); }
 body.is-test .deck.with-banner { height: calc(100dvh - var(--top-h) - var(--nav-h) - var(--safe-b) - 84px); }
+
+/* ---------- 仲間とカードのやりとり ---------- */
+.friend-tag { display: inline-block; margin-top: 4px; font-size: 12px; font-weight: 800; color: var(--ink); background: rgba(255,255,255,.55); border: 1px dashed rgba(15,42,68,.45); border-radius: 8px; padding: 0 8px; }
+.card-head.has-photo .friend-tag { color: var(--ink); text-shadow: none; }
+.friend-mini { font-size: 11px; font-weight: 700; color: var(--sub); margin: 0 6px 0 4px; white-space: nowrap; }
+.action-sheet .memo-sheet-body .btn.wide { margin-top: 10px; }
+.action-sheet .memo-sheet-body { white-space: normal; font-size: 15px; }
+.check { display: flex; align-items: center; gap: 8px; margin: 10px 0; font-weight: 600; }
+.check input { width: 22px; height: 22px; }
+.send-box { background: var(--card); border-radius: 12px; padding: 4px 12px 6px; margin-bottom: 8px; }
+.shared-box { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: -4px 0 12px; }
+.shared-box .chip { min-height: 36px; }
+.friend-main span { white-space: normal !important; }
+.friend-main b { white-space: nowrap; }
