@@ -14,10 +14,11 @@ import { seasonXlsx } from './export.js';
 import { shareTrip, downloadBlob, renderSeasonImage, shareBlob } from './share.js';
 import { placeStats, similarTrips, personalBests, recordBadges, newRecords } from './insights.js';
 import { fetchWeather } from './weather.js';
-import { packToLink, parseCardText, makeCardPack, checkCardPack, importCardPack, friendsOf, analysisTrips, ownTrips, isShared, sharedFrom } from './cards.js';
+import { SHARE } from './config.js';
+import { packToLink, parseCardText, uploadPack, downloadPack, shortLinkMessage, shareIdIn, makeCardPack, checkCardPack, importCardPack, friendsOf, analysisTrips, ownTrips, isShared, sharedFrom } from './cards.js';
 import { shiomawari, tideForTrip } from './tide.js';
 
-const APP_VERSION = '0.5.0';
+const APP_VERSION = '0.6.0';
 
 const state = {
   trips: [],
@@ -87,7 +88,7 @@ function sendCardsSheet(list) {
   sheet(`
     <div class="memo-sheet-head"><span>📇 カードをあげる（${own.length}枚）</span><button type="button" class="memo-close" data-sheet="close" aria-label="閉じる">×</button></div>
     <div class="memo-sheet-body form">
-      <p class="muted">カードをリンクにして、LINEのメッセージで送ります。受け取った人がリンクを押すと、その人のお豆日記に「あなたのカード」として入ります（写真は送りません）。</p>
+      <p class="muted">カードをリンクにして、LINEのメッセージで送ります。受け取った人がリンクを押すと、その人のお豆日記に「あなたのカード」として入ります（写真は送りません）。${SHARE.projectId ? 'リンクは30日間使えます。' : ''}</p>
       <label class="field"><span class="lbl">あなたの名前（相手のアプリに「◯◯さんのカード」と出ます）</span><input id="send-name" value="${esc(state.myName)}" placeholder="例: たろう" maxlength="20"></label>
       <label class="check"><input type="checkbox" id="send-memo" checked> メモも入れる</label>
       <button type="button" class="btn primary wide" data-sheet="send">LINEで送る</button>
@@ -97,9 +98,20 @@ function sendCardsSheet(list) {
     if (!name) { toast('名前を入れてください'); $('#send-name', ov).focus(); return; }
     if (name !== state.myName) { state.myName = name; await db.setKV('myName', name); }
     const pack = makeCardPack(own, name, { memo: $('#send-memo', ov).checked, photos: false });
-    const msg = await packToLink(pack, appUrl());
     close();
-    if (msg.length > 9000) toast('カードが多いので、LINEの1通に入らないかもしれません。年や釣り物をしぼって送ってください');
+    let msg;
+    if (SHARE.projectId) {
+      // カードを保管場所に置いて、短いリンクにする（30日で消える）
+      toast('リンクを作っています…');
+      try {
+        msg = shortLinkMessage(pack, appUrl(), await uploadPack(pack, SHARE));
+      } catch {
+        return toast(navigator.onLine ? 'リンクを作れませんでした。少し待ってから、もう一度ためしてください' : '電波がないため、リンクを作れません');
+      }
+    } else {
+      msg = await packToLink(pack, appUrl());
+      if (msg.length > 9000) toast('カードが多いので、LINEの1通に入らないかもしれません。年や釣り物をしぼって送ってください');
+    }
     if (navigator.share) {
       try { await navigator.share({ text: msg }); return; } catch (err) { if (err.name === 'AbortError') return; }
     }
@@ -117,7 +129,19 @@ async function viewReceiveLink() {
 }
 
 async function receiveCards(file, after) {
-  const data = await parseCardText(await file.text());
+  const text = await file.text();
+  const id = shareIdIn(text);
+  let data;
+  if (id && SHARE.projectId) {
+    // 短いリンク：保管場所からカードを取ってくる
+    toast('カードを取りに行っています…');
+    try { data = await downloadPack(id, SHARE); } catch {
+      return toast(navigator.onLine ? 'カードを取れませんでした。少し待ってから、もう一度リンクを押してください' : '電波がないため、カードを取れません。電波のある所でもう一度リンクを押してください');
+    }
+    if (!data) return toast('このリンクは期限が切れています（30日）。もう一度送ってもらってください');
+  } else {
+    data = await parseCardText(text);
+  }
   if (!data) return toast('カードを読めませんでした。リンクが途中で切れていないか確かめてください');
   const why = checkCardPack(data);
   if (why) return toast(why);
@@ -1619,7 +1643,7 @@ function viewSettings() {
       let text = '';
       try { text = await navigator.clipboard.readText(); } catch { /* 許可がない */ }
       const after = () => { if (root.isConnected) render(); };
-      if (text && (await parseCardText(text))) return receiveCards({ text: async () => text }, after);
+      if (text && (shareIdIn(text) || (await parseCardText(text)))) return receiveCards({ text: async () => text }, after);
       sheet(`
         <div class="memo-sheet-head"><span>📋 貼り付けて読み込む</span><button type="button" class="memo-close" data-sheet="close" aria-label="閉じる">×</button></div>
         <div class="memo-sheet-body form">
@@ -1746,7 +1770,7 @@ async function route() {
     state.onLeave = null;
     await fn();
   }
-  if (/^#c=/.test(location.hash)) return viewReceiveLink();
+  if (/^#[ck]=/.test(location.hash)) return viewReceiveLink();
   const [path, qs] = location.hash.replace(/^#/, '').split('?');
   const parts = path.split('/').filter(Boolean);
   const params = new URLSearchParams(qs || '');

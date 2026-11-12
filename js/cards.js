@@ -99,14 +99,54 @@ async function pipe(bytes, stream) {
   return new Uint8Array(await out.arrayBuffer());
 }
 
-// カード → 送るメッセージ（リンク付き）。appUrl はアプリのURL（末尾は /）
+// カード → 短い文字（gzip → base64url）
+export async function packToCode(pack) {
+  return toB64url(await pipe(new TextEncoder().encode(JSON.stringify(pack)), new CompressionStream('gzip')));
+}
+async function codeToPack(code) {
+  const bytes = await pipe(fromB64url(code), new DecompressionStream('gzip'));
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+
+const head = (pack) => `🐟 お豆日記のカード（${pack.from}さん・${pack.trips.length}枚）\nリンクを押すと、お豆日記に読み込めます。\n`;
+
+// カード → 送るメッセージ（カードを全部リンクに入れる長いリンク。保管場所がないとき用）。appUrl はアプリのURL（末尾は /）
 // openExternalBrowser=1 は、LINE の中のブラウザではなく、いつものブラウザ（お豆日記）で開かせるための LINE の決まり
 export async function packToLink(pack, appUrl) {
-  const zipped = await pipe(new TextEncoder().encode(JSON.stringify(pack)), new CompressionStream('gzip'));
-  return `🐟 お豆日記のカード（${pack.from}さん・${pack.trips.length}枚）\n`
-    + 'リンクを押すと、お豆日記に読み込めます。\n'
-    + `${appUrl}?openExternalBrowser=1#c=${toB64url(zipped)}`;
+  return `${head(pack)}${appUrl}?openExternalBrowser=1#c=${await packToCode(pack)}`;
 }
+
+// ---------- 短いリンク：カードを保管場所（Firestore）に置き、リンクには番号だけを入れる ----------
+const ID_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // まぎらわしい 0・O・1・I は使わない
+export function newShareId(n = 12) {
+  const r = crypto.getRandomValues(new Uint8Array(n));
+  return [...r].map((x) => ID_CHARS[x % ID_CHARS.length]).join('');
+}
+const docUrl = (cfg, id = '') => `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/(default)/documents/cards${id ? `/${id}` : ''}`;
+export const KEEP_DAYS = 30;
+
+// カードを保管場所に置く → 番号。置けなければエラー
+export async function uploadPack(pack, cfg, fetchFn = fetch, now = Date.now()) {
+  const id = newShareId();
+  const body = { fields: {
+    d: { stringValue: await packToCode(pack) },
+    exp: { timestampValue: new Date(now + KEEP_DAYS * 86400000).toISOString() }, // この日を過ぎたら消してよい
+  } };
+  const res = await fetchFn(`${docUrl(cfg)}?documentId=${id}&key=${cfg.apiKey}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  if (!res.ok) throw new Error(`upload ${res.status}`);
+  return id;
+}
+// 番号 → カード。もう消えていたら null
+export async function downloadPack(id, cfg, fetchFn = fetch) {
+  const res = await fetchFn(`${docUrl(cfg, id)}?key=${cfg.apiKey}`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`download ${res.status}`);
+  const code = (await res.json())?.fields?.d?.stringValue;
+  return code ? codeToPack(code) : null;
+}
+export const shortLinkMessage = (pack, appUrl, id) => `${head(pack)}${appUrl}?openExternalBrowser=1#k=${id}`;
+// 文の中の短いリンクの番号（なければ ''）
+export const shareIdIn = (text) => (String(text || '').match(/[#&]k=([A-Z2-9]{8,20})(?![A-Za-z0-9_-])/) || [])[1] || '';
 
 // リンク・貼り付けた文字 → カードのデータ（読めなければ null）
 // 「#c=…」のリンクでも、そのままの JSON でも読む。前後に余計な文があってもよい
@@ -114,10 +154,7 @@ export async function parseCardText(text) {
   const s = String(text || '');
   const m = s.match(/[#&]c=([A-Za-z0-9_-]{16,})/) || s.match(/OMAME1:([A-Za-z0-9_-]{16,})/);
   if (m) {
-    try {
-      const bytes = await pipe(fromB64url(m[1]), new DecompressionStream('gzip'));
-      return JSON.parse(new TextDecoder().decode(bytes));
-    } catch { return null; }
+    try { return await codeToPack(m[1]); } catch { return null; }
   }
   const a = s.indexOf('{'), b = s.lastIndexOf('}');
   if (a < 0 || b <= a) return null;

@@ -110,3 +110,44 @@ test('send as a link and read it back', async () => {
   assert.equal(await parseCardText('#/settings'), null);
   assert.equal(await parseCardText('こんにちは'), null);
 });
+
+test('short link: store the cards, send only an id', async () => {
+  const { uploadPack, downloadPack, shortLinkMessage, shareIdIn, newShareId, parseCardText } = await import('../js/cards.js');
+  const cfg = { projectId: 'demo-proj', apiKey: 'KEY' };
+  const pack = makeCardPack(taro, 'たろう');
+  // 保管場所のまね
+  const store = new Map();
+  const calls = [];
+  const fake = async (url, opt) => {
+    calls.push([opt?.method || 'GET', url]);
+    const u = new URL(url);
+    if (opt?.method === 'POST') { store.set(u.searchParams.get('documentId'), JSON.parse(opt.body)); return { ok: true, status: 200, json: async () => ({}) }; }
+    const doc = store.get(u.pathname.split('/').pop());
+    return doc ? { ok: true, status: 200, json: async () => doc } : { ok: false, status: 404, json: async () => ({}) };
+  };
+  const now = Date.UTC(2026, 10, 12);
+  const id = await uploadPack(pack, cfg, fake, now);
+  assert.match(id, /^[A-Z2-9]{12}$/);
+  assert.ok(calls[0][1].startsWith('https://firestore.googleapis.com/v1/projects/demo-proj/databases/(default)/documents/cards?documentId='));
+  const doc = store.get(id);
+  assert.deepEqual(Object.keys(doc.fields).sort(), ['d', 'exp']); // ルールで許す2つの項目だけ
+  assert.equal(doc.fields.exp.timestampValue, '2026-12-12T00:00:00.000Z'); // 30日後
+  // 短いリンク
+  const msg = shortLinkMessage(pack, 'https://example.github.io/Azing-nikki/', id);
+  const link = msg.split('\n').pop();
+  assert.equal(link, `https://example.github.io/Azing-nikki/?openExternalBrowser=1#k=${id}`);
+  assert.ok(link.length < 90);
+  assert.equal(shareIdIn(new URL(link).hash), id);
+  assert.equal(shareIdIn(`転送: ${msg}`), id);
+  assert.equal(shareIdIn('#/settings'), '');
+  assert.equal(shareIdIn('#c=H4sIAAAAAAAAA'), '');
+  // 受け取る
+  const back = await downloadPack(id, cfg, fake);
+  assert.equal(checkCardPack(back), '');
+  assert.equal(back.trips.length, 3);
+  assert.equal(await downloadPack(newShareId(), cfg, fake), null); // 30日たって消えたリンク
+  await assert.rejects(uploadPack(pack, cfg, async () => ({ ok: false, status: 403 })));
+  await assert.rejects(downloadPack(id, cfg, async () => ({ ok: false, status: 500 })));
+  // 短いリンクは parseCardText では読めない（保管場所から取る）
+  assert.equal(await parseCardText(new URL(link).hash), null);
+});
