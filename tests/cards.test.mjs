@@ -132,6 +132,10 @@ test('short link: store the cards, send only an id', async () => {
   const doc = store.get(id);
   assert.deepEqual(Object.keys(doc.fields).sort(), ['d', 'exp']); // ルールで許す2つの項目だけ
   assert.equal(doc.fields.exp.timestampValue, '2026-12-12T00:00:00.000Z'); // 30日後
+  // データベースに名前が付いているとき
+  const named = [];
+  await uploadPack(pack, { ...cfg, databaseId: 'omame-nikki' }, async (url) => { named.push(url); return { ok: true, status: 200, json: async () => ({}) }; });
+  assert.ok(named[0].includes('/databases/omame-nikki/documents/cards?documentId='));
   // 短いリンク
   const msg = shortLinkMessage(pack, 'https://example.github.io/Azing-nikki/', id);
   const link = msg.split('\n').pop();

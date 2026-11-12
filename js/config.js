@@ -4,5 +4,6 @@
 // 空のままなら、カードは保管せず、長いリンクで送る
 export const SHARE = {
   projectId: 'omame-nikki',
+  databaseId: 'omame-nikki', // Firestore のデータベースの名前（初期値の (default) ではない）
   apiKey: 'AIzaSyBhz07lEFkNbBH1xZbrmFgplur0B8jHfMI',
 };

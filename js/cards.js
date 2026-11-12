@@ -122,7 +122,7 @@ export function newShareId(n = 12) {
   const r = crypto.getRandomValues(new Uint8Array(n));
   return [...r].map((x) => ID_CHARS[x % ID_CHARS.length]).join('');
 }
-const docUrl = (cfg, id = '') => `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/(default)/documents/cards${id ? `/${id}` : ''}`;
+const docUrl = (cfg, id = '') => `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/${cfg.databaseId || '(default)'}/documents/cards${id ? `/${id}` : ''}`;
 export const KEEP_DAYS = 30;
 
 // カードを保管場所に置く → 番号。置けなければエラー
