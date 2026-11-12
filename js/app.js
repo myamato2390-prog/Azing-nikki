@@ -14,10 +14,10 @@ import { seasonXlsx } from './export.js';
 import { shareTrip, downloadBlob, renderSeasonImage, shareBlob } from './share.js';
 import { placeStats, similarTrips, personalBests, recordBadges, newRecords } from './insights.js';
 import { fetchWeather } from './weather.js';
-import { makeCardPack, checkCardPack, importCardPack, friendsOf, analysisTrips, ownTrips, isShared, sharedFrom } from './cards.js';
+import { packToText, parseCardText, makeCardPack, checkCardPack, importCardPack, friendsOf, analysisTrips, ownTrips, isShared, sharedFrom } from './cards.js';
 import { shiomawari, tideForTrip } from './tide.js';
 
-const APP_VERSION = '0.4.2';
+const APP_VERSION = '0.4.3';
 
 const state = {
   trips: [],
@@ -84,29 +84,35 @@ function sendCardsSheet(list) {
   sheet(`
     <div class="memo-sheet-head"><span>📇 カードをあげる（${own.length}枚）</span><button type="button" class="memo-close" data-sheet="close" aria-label="閉じる">×</button></div>
     <div class="memo-sheet-body form">
-      <p class="muted">カードのデータをファイルにして送ります。受け取った人がお豆日記で読み込むと、その人のアプリに「あなたのカード」として入ります。</p>
+      <p class="muted">カードのデータを送ります。受け取った人がお豆日記で読み込むと、その人のアプリに「あなたのカード」として入ります。</p>
       <label class="field"><span class="lbl">あなたの名前（相手のアプリに「◯◯さんのカード」と出ます）</span><input id="send-name" value="${esc(state.myName)}" placeholder="例: たろう" maxlength="20"></label>
       <label class="check"><input type="checkbox" id="send-memo" checked> メモも入れる</label>
-      <label class="check"><input type="checkbox" id="send-photo"> 写真も入れる（ファイルが大きくなります）</label>
-      <button type="button" class="btn primary wide" data-sheet="send">LINEなどで送る</button>
+      <label class="check"><input type="checkbox" id="send-photo"> 写真も入れる（とても長くなるので、メッセージでは送れません。「ファイルを保存する」で送ってください）</label>
+      <button type="button" class="btn primary wide" data-sheet="send">LINEで送る（メッセージ）</button>
+      <button type="button" class="btn wide" data-sheet="copy">メッセージをコピーする</button>
       <button type="button" class="btn wide" data-sheet="save">ファイルを保存する</button>
-      <p class="muted">LINEでファイルが届かなかったときは「ファイルを保存する」を押して、LINEのトークの「＋」→「ファイル」から、保存したファイル（ダウンロードの中の「お豆日記カード_…」）を選んで送ってください。</p>
+      <p class="muted">カードは短い文字にまとめて、LINEのメッセージで送ります。受け取った人は、そのメッセージを長押しして「コピー」し、お豆日記の 設定 →「コピーしたカードを貼り付ける」で読み込みます。送る画面にLINEが出ないときは「メッセージをコピーする」を押して、LINEのトークに貼り付けてください。</p>
     </div>`, async (e, close, ov) => {
-    const how = e.target.closest('[data-sheet="send"], [data-sheet="save"]')?.dataset.sheet;
+    const how = e.target.closest('[data-sheet="send"], [data-sheet="copy"], [data-sheet="save"]')?.dataset.sheet;
     if (!how) return;
     const name = $('#send-name', ov).value.trim();
     if (!name) { toast('名前を入れてください'); $('#send-name', ov).focus(); return; }
     if (name !== state.myName) { state.myName = name; await db.setKV('myName', name); }
     const pack = makeCardPack(own, name, { memo: $('#send-memo', ov).checked, photos: $('#send-photo', ov).checked });
     close();
-    // 中身は JSON のまま、テキストのファイルにする（LINE などに渡せる種類にするため）
+    // メッセージで送る：LINE は文字のファイルを文章として送ってしまうので、最初から文章にする
+    if (how === 'send' || how === 'copy') {
+      const msg = await packToText(pack);
+      if (msg.length > 9000) toast(`カードが多いため、LINEの1通に入らないかもしれません。年や釣り物をしぼって送ってください`);
+      if (how === 'send' && navigator.share) {
+        try { await navigator.share({ text: msg }); return; } catch (err) { if (err.name === 'AbortError') return; }
+      }
+      try { await navigator.clipboard.writeText(msg); toast('コピーしました。LINEのトークに貼り付けて送ってください'); } catch { toast('コピーできませんでした。「ファイルを保存する」を使ってください'); }
+      return;
+    }
+    // ファイルで送る：中身は JSON のまま、テキストのファイルにする
     const fname = `お豆日記カード_${name}_${todayISO()}_${pack.trips.length}枚.txt`;
     const blob = new Blob([JSON.stringify(pack)], { type: 'text/plain' });
-    const file = new File([blob], fname, { type: 'text/plain' });
-    // 文を一緒に渡すと、LINE は文だけを送ってファイルを落とすことがあるので、ファイルだけを渡す
-    if (how === 'send' && navigator.canShare?.({ files: [file] })) {
-      try { await navigator.share({ files: [file] }); return; } catch (err) { if (err.name === 'AbortError') return; }
-    }
     downloadBlob(blob, fname);
     toast('ファイルを保存しました。LINEのトークの「＋」→「ファイル」から送ってください');
   });
@@ -128,8 +134,8 @@ async function viewReceive() {
 }
 
 async function receiveCards(file, after) {
-  let data;
-  try { data = JSON.parse(await file.text()); } catch { return toast('ファイルを読めませんでした'); }
+  const data = await parseCardText(await file.text());
+  if (!data) return toast('カードを読めませんでした。メッセージ全体をコピーしたか確かめてください');
   const why = checkCardPack(data);
   if (why) return toast(why);
   const r = importCardPack(data, state.trips);
@@ -1519,10 +1525,11 @@ function viewSettings() {
           ${field('年', `<select id="send-year"><option value="">すべて</option>${seasons(mine()).map((y) => `<option value="${y}">${y}年</option>`).join('')}</select>`)}
           ${field('釣り物', `<select id="send-kind"><option value="">両方</option>${KINDS.map((k) => `<option value="${k}">${kindName(k)}</option>`).join('')}</select>`)}
         </div>
-        <p class="muted">LINEで届いたカードのファイルは、ファイルを開いて「共有」→「お豆日記」を選ぶと、そのまま読み込めます（ホーム画面に追加したお豆日記のときだけ）。</p>
+        <p class="muted">LINEで届いたカードのメッセージは、長押しして「コピー」してから「📋 コピーしたカードを貼り付ける」を押すと読み込めます。カードのファイルは「もらったカードを読み込む」から選べます。</p>
         <div class="tools">
           <button type="button" class="btn" data-act="send-cards">📇 カードをあげる</button>
-          <label class="btn"><input type="file" accept=".txt,.json,text/plain,application/json" hidden id="receive-cards">🤝 もらったカードを読み込む</label>
+          <button type="button" class="btn primary" data-act="paste-cards">📋 コピーしたカードを貼り付ける</button>
+          <label class="btn"><input type="file" accept=".txt,.json,text/plain,application/json" hidden id="receive-cards">🤝 もらったカードのファイルを読み込む</label>
         </div>
       </div>
       <div id="friend-list"></div>
@@ -1623,6 +1630,27 @@ function viewSettings() {
       return;
     }
     if (act === 'del-no') { renderDelList(); return; }
+    if (act === 'paste-cards') {
+      // まずクリップボードから読む。だめなら貼り付ける欄を出す
+      let text = '';
+      try { text = await navigator.clipboard.readText(); } catch { /* 許可がない */ }
+      const after = () => { if (root.isConnected) render(); };
+      if (text && (await parseCardText(text))) return receiveCards({ text: async () => text }, after);
+      sheet(`
+        <div class="memo-sheet-head"><span>📋 コピーしたカードを貼り付ける</span><button type="button" class="memo-close" data-sheet="close" aria-label="閉じる">×</button></div>
+        <div class="memo-sheet-body form">
+          <p class="muted">LINEのメッセージを長押しして「コピー」し、下の欄を長押しして「貼り付け」してください。</p>
+          <textarea id="paste-box" rows="6" placeholder="ここに貼り付け"></textarea>
+          <button type="button" class="btn primary wide" data-sheet="paste-go">読み込む</button>
+        </div>`, async (ev, close, ov) => {
+        if (!ev.target.closest('[data-sheet="paste-go"]')) return;
+        const t = $('#paste-box', ov).value;
+        if (!t.trim()) return toast('貼り付けてから押してください');
+        close();
+        await receiveCards({ text: async () => t }, after);
+      });
+      return;
+    }
     if (act === 'send-cards') {
       const y = $('#send-year', root).value, k = $('#send-kind', root).value;
       return sendCardsSheet(mine().filter((t) => (!y || String(seasonOf(t)) === y) && (!k || t.kind === k)));

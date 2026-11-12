@@ -83,3 +83,24 @@ test('search: own cards by default, friends on request', () => {
   assert.equal(filterTrips(all, { who: 'friends' }).length, 3);
   assert.equal(filterTrips(all, { who: 'all', text: 'たろう' }).length, 3);
 });
+
+test('send as a LINE message and read it back', async () => {
+  const { packToText, parseCardText, TEXT_MARK } = await import('../js/cards.js');
+  const many = Array.from({ length: 20 }, (_, i) => mk({ id: `t${i}`, date: '2026-10-01', river: '三崎港', count: i, memo: '常夜灯の明暗の境目で連発。風が強くなってからは1.0gで。' }));
+  const pack = makeCardPack(many, 'たろう');
+  const msg = await packToText(pack);
+  assert.ok(msg.startsWith('🐟 お豆日記のカード（たろうさん・20枚）'));
+  assert.ok(msg.includes(TEXT_MARK));
+  // そのままの JSON より、ずっと短い（LINE の1通に収まりやすい）
+  assert.ok(msg.length < JSON.stringify(pack).length / 3, `${msg.length} vs ${JSON.stringify(pack).length}`);
+  // 長押し→コピーで、前後に余計な文が付いても読める
+  const back = await parseCardText(`転送: ${msg}\n既読`);
+  assert.equal(checkCardPack(back), '');
+  assert.equal(back.trips.length, 20);
+  assert.equal(back.from, 'たろう');
+  // そのままの JSON（v0.4.2 までのファイルや、文章になって届いたもの）も読める
+  assert.equal((await parseCardText(JSON.stringify(pack))).trips.length, 20);
+  // 壊れた文字は null
+  assert.equal(await parseCardText('OMAME1:abc'), null);
+  assert.equal(await parseCardText('こんにちは'), null);
+});

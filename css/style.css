@@ -405,3 +405,4 @@ body.is-test .deck.with-banner { height: calc(100dvh - var(--top-h) - var(--nav-
 .shared-box .chip { min-height: 36px; }
 .friend-main span { white-space: normal !important; }
 .friend-main b { white-space: nowrap; }
+#paste-box { width: 100%; min-height: 120px; padding: 10px 12px; border: 1px solid var(--field-line); border-radius: 10px; background: var(--field); font-size: 13px; }

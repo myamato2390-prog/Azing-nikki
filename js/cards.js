@@ -81,3 +81,48 @@ export function analysisTrips(trips, opts = {}) {
 
 // 自分のカードだけ（自己ベスト・🏆・入力の候補など）
 export const ownTrips = (trips) => trips.filter((t) => !isShared(t));
+
+// ---------- 文字で送る・受け取る（LINE のメッセージ用） ----------
+// LINE は文字のファイルをメッセージの文章として送ってしまうので、最初から文章で送る。
+// カードの JSON を gzip で縮め、base64url にして「OMAME1:」を前に付ける（1通に収まりやすくするため）
+export const TEXT_MARK = 'OMAME1:';
+
+const toB64url = (bytes) => {
+  let s = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+};
+const fromB64url = (s) => {
+  const b = atob(s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4));
+  return Uint8Array.from(b, (c) => c.charCodeAt(0));
+};
+async function pipe(bytes, stream) {
+  const out = new Response(new Blob([bytes]).stream().pipeThrough(stream));
+  return new Uint8Array(await out.arrayBuffer());
+}
+
+// カードのファイルの中身（JSON の文字列）→ 送るメッセージ
+export async function packToText(pack) {
+  const zipped = await pipe(new TextEncoder().encode(JSON.stringify(pack)), new CompressionStream('gzip'));
+  const n = pack.trips.length;
+  return `🐟 お豆日記のカード（${pack.from}さん・${n}枚）\n`
+    + 'このメッセージを長押しして「コピー」→ お豆日記の 設定 →「コピーしたカードを貼り付ける」で読み込めます。\n'
+    + TEXT_MARK + toB64url(zipped);
+}
+
+// 貼り付けた文字・共有された文字・ファイルの中身 → カードのデータ（読めなければ null）
+// 「OMAME1:…」の形でも、そのままの JSON でも読む。前後に余計な文があってもよい
+export async function parseCardText(text) {
+  const s = String(text || '');
+  const i = s.indexOf(TEXT_MARK);
+  if (i >= 0) {
+    const code = (s.slice(i + TEXT_MARK.length).match(/^[A-Za-z0-9_-]+/) || [''])[0];
+    try {
+      const bytes = await pipe(fromB64url(code), new DecompressionStream('gzip'));
+      return JSON.parse(new TextDecoder().decode(bytes));
+    } catch { return null; }
+  }
+  const a = s.indexOf('{'), b = s.lastIndexOf('}');
+  if (a < 0 || b <= a) return null;
+  try { return JSON.parse(s.slice(a, b + 1)); } catch { return null; }
+}
