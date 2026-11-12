@@ -2,7 +2,7 @@
 // テスト版（/preview/）は名前を分け、本番・テスト版・鮎日記のキャッシュを互いに消さない
 const TEST = self.location.pathname.includes('/preview/');
 const PREFIX = TEST ? 'aji-nikki-test-v' : 'aji-nikki-v';
-const VERSION = `${PREFIX}0.4.1`;
+const VERSION = `${PREFIX}0.4.2`;
 // 共有されたファイルを、アプリが読むまで置いておく場所（版を上げても消さない）
 const SHARE_CACHE = TEST ? 'aji-nikki-test-share' : 'aji-nikki-share';
 const FILES = [
@@ -34,6 +34,12 @@ async function receiveShare(request) {
     let i = 0;
     for (const f of files) {
       await cache.put(`./shared-file-${i++}`, new Response(f, { headers: { 'content-type': f.type || 'text/plain', 'x-file-name': encodeURIComponent(f.name || '') } }));
+    }
+    // ファイルではなく、中身の文章として届いたとき（カードのファイルの中身なら読み込む）
+    const text = String(form.get('text') || '');
+    if (!i && text.includes('"type":"cards"')) {
+      const start = text.indexOf('{'), end = text.lastIndexOf('}');
+      if (start >= 0 && end > start) await cache.put(`./shared-file-${i++}`, new Response(text.slice(start, end + 1), { headers: { 'content-type': 'text/plain' } }));
     }
     return Response.redirect(`./#/receive?n=${i}`, 303);
   } catch {

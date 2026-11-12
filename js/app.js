@@ -17,7 +17,7 @@ import { fetchWeather } from './weather.js';
 import { makeCardPack, checkCardPack, importCardPack, friendsOf, analysisTrips, ownTrips, isShared, sharedFrom } from './cards.js';
 import { shiomawari, tideForTrip } from './tide.js';
 
-const APP_VERSION = '0.4.1';
+const APP_VERSION = '0.4.2';
 
 const state = {
   trips: [],
@@ -89,22 +89,26 @@ function sendCardsSheet(list) {
       <label class="check"><input type="checkbox" id="send-memo" checked> メモも入れる</label>
       <label class="check"><input type="checkbox" id="send-photo"> 写真も入れる（ファイルが大きくなります）</label>
       <button type="button" class="btn primary wide" data-sheet="send">LINEなどで送る</button>
+      <button type="button" class="btn wide" data-sheet="save">ファイルを保存する</button>
+      <p class="muted">LINEでファイルが届かなかったときは「ファイルを保存する」を押して、LINEのトークの「＋」→「ファイル」から、保存したファイル（ダウンロードの中の「お豆日記カード_…」）を選んで送ってください。</p>
     </div>`, async (e, close, ov) => {
-    if (!e.target.closest('[data-sheet="send"]')) return;
+    const how = e.target.closest('[data-sheet="send"], [data-sheet="save"]')?.dataset.sheet;
+    if (!how) return;
     const name = $('#send-name', ov).value.trim();
     if (!name) { toast('名前を入れてください'); $('#send-name', ov).focus(); return; }
     if (name !== state.myName) { state.myName = name; await db.setKV('myName', name); }
     const pack = makeCardPack(own, name, { memo: $('#send-memo', ov).checked, photos: $('#send-photo', ov).checked });
     close();
-    // LINE に渡せるよう、中身は JSON のままテキストのファイルにする
+    // 中身は JSON のまま、テキストのファイルにする（LINE などに渡せる種類にするため）
     const fname = `お豆日記カード_${name}_${todayISO()}_${pack.trips.length}枚.txt`;
     const blob = new Blob([JSON.stringify(pack)], { type: 'text/plain' });
     const file = new File([blob], fname, { type: 'text/plain' });
-    if (navigator.canShare?.({ files: [file] })) {
-      try { await navigator.share({ files: [file], text: `【お豆日記】${name}さんからカード${pack.trips.length}枚` }); return; } catch (err) { if (err.name === 'AbortError') return; }
+    // 文を一緒に渡すと、LINE は文だけを送ってファイルを落とすことがあるので、ファイルだけを渡す
+    if (how === 'send' && navigator.canShare?.({ files: [file] })) {
+      try { await navigator.share({ files: [file] }); return; } catch (err) { if (err.name === 'AbortError') return; }
     }
     downloadBlob(blob, fname);
-    toast('ファイルを保存しました。LINEから送ってください');
+    toast('ファイルを保存しました。LINEのトークの「＋」→「ファイル」から送ってください');
   });
 }
 
