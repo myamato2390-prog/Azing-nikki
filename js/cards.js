@@ -82,11 +82,9 @@ export function analysisTrips(trips, opts = {}) {
 // 自分のカードだけ（自己ベスト・🏆・入力の候補など）
 export const ownTrips = (trips) => trips.filter((t) => !isShared(t));
 
-// ---------- 文字で送る・受け取る（LINE のメッセージ用） ----------
-// LINE は文字のファイルをメッセージの文章として送ってしまうので、最初から文章で送る。
-// カードの JSON を gzip で縮め、base64url にして「OMAME1:」を前に付ける（1通に収まりやすくするため）
-export const TEXT_MARK = 'OMAME1:';
-
+// ---------- リンクで送る・受け取る（LINE のメッセージ用） ----------
+// カードの JSON を gzip で縮めて base64url にし、アプリのURLの「#c=」の後ろに付ける。
+// 受け取った人はリンクを押すだけ。「#」より後ろはサーバーに送られないので、カードはどこにも保存されない
 const toB64url = (bytes) => {
   let s = '';
   for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
@@ -101,24 +99,23 @@ async function pipe(bytes, stream) {
   return new Uint8Array(await out.arrayBuffer());
 }
 
-// カードのファイルの中身（JSON の文字列）→ 送るメッセージ
-export async function packToText(pack) {
+// カード → 送るメッセージ（リンク付き）。appUrl はアプリのURL（末尾は /）
+// openExternalBrowser=1 は、LINE の中のブラウザではなく、いつものブラウザ（お豆日記）で開かせるための LINE の決まり
+export async function packToLink(pack, appUrl) {
   const zipped = await pipe(new TextEncoder().encode(JSON.stringify(pack)), new CompressionStream('gzip'));
-  const n = pack.trips.length;
-  return `🐟 お豆日記のカード（${pack.from}さん・${n}枚）\n`
-    + 'このメッセージを長押しして「コピー」→ お豆日記の 設定 →「コピーしたカードを貼り付ける」で読み込めます。\n'
-    + TEXT_MARK + toB64url(zipped);
+  return `🐟 お豆日記のカード（${pack.from}さん・${pack.trips.length}枚）\n`
+    + 'リンクを押すと、お豆日記に読み込めます。\n'
+    + `${appUrl}?openExternalBrowser=1#c=${toB64url(zipped)}`;
 }
 
-// 貼り付けた文字・共有された文字・ファイルの中身 → カードのデータ（読めなければ null）
-// 「OMAME1:…」の形でも、そのままの JSON でも読む。前後に余計な文があってもよい
+// リンク・貼り付けた文字 → カードのデータ（読めなければ null）
+// 「#c=…」のリンクでも、そのままの JSON でも読む。前後に余計な文があってもよい
 export async function parseCardText(text) {
   const s = String(text || '');
-  const i = s.indexOf(TEXT_MARK);
-  if (i >= 0) {
-    const code = (s.slice(i + TEXT_MARK.length).match(/^[A-Za-z0-9_-]+/) || [''])[0];
+  const m = s.match(/[#&]c=([A-Za-z0-9_-]{16,})/) || s.match(/OMAME1:([A-Za-z0-9_-]{16,})/);
+  if (m) {
     try {
-      const bytes = await pipe(fromB64url(code), new DecompressionStream('gzip'));
+      const bytes = await pipe(fromB64url(m[1]), new DecompressionStream('gzip'));
       return JSON.parse(new TextDecoder().decode(bytes));
     } catch { return null; }
   }

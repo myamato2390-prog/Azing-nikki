@@ -84,23 +84,29 @@ test('search: own cards by default, friends on request', () => {
   assert.equal(filterTrips(all, { who: 'all', text: 'たろう' }).length, 3);
 });
 
-test('send as a LINE message and read it back', async () => {
-  const { packToText, parseCardText, TEXT_MARK } = await import('../js/cards.js');
+test('send as a link and read it back', async () => {
+  const { packToLink, parseCardText } = await import('../js/cards.js');
   const many = Array.from({ length: 20 }, (_, i) => mk({ id: `t${i}`, date: '2026-10-01', river: '三崎港', count: i, memo: '常夜灯の明暗の境目で連発。風が強くなってからは1.0gで。' }));
   const pack = makeCardPack(many, 'たろう');
-  const msg = await packToText(pack);
+  const msg = await packToLink(pack, 'https://example.github.io/Azing-nikki/');
   assert.ok(msg.startsWith('🐟 お豆日記のカード（たろうさん・20枚）'));
-  assert.ok(msg.includes(TEXT_MARK));
+  const link = msg.split('\n').pop();
+  assert.ok(link.startsWith('https://example.github.io/Azing-nikki/?openExternalBrowser=1#c='));
+  assert.ok(/^[A-Za-z0-9_-]+$/.test(link.split('#c=')[1])); // リンクが途中で切れない文字だけ
   // そのままの JSON より、ずっと短い（LINE の1通に収まりやすい）
   assert.ok(msg.length < JSON.stringify(pack).length / 3, `${msg.length} vs ${JSON.stringify(pack).length}`);
-  // 長押し→コピーで、前後に余計な文が付いても読める
-  const back = await parseCardText(`転送: ${msg}\n既読`);
+  // リンクを押したとき（#c=…）
+  const back = await parseCardText(new URL(link).hash);
   assert.equal(checkCardPack(back), '');
   assert.equal(back.trips.length, 20);
   assert.equal(back.from, 'たろう');
-  // そのままの JSON（v0.4.2 までのファイルや、文章になって届いたもの）も読める
+  // メッセージ全体を長押し→コピー→貼り付けでも読める
+  assert.equal((await parseCardText(`転送: ${msg}\n既読`)).trips.length, 20);
+  // v0.4.3 のテスト版の形（OMAME1:…）と、そのままの JSON も読める
+  assert.equal((await parseCardText('OMAME1:' + link.split('#c=')[1])).trips.length, 20);
   assert.equal((await parseCardText(JSON.stringify(pack))).trips.length, 20);
-  // 壊れた文字は null
-  assert.equal(await parseCardText('OMAME1:abc'), null);
+  // 壊れた文字・関係ない文字は null
+  assert.equal(await parseCardText('#c=abcdefghijklmnopqrstuvwxyz'), null);
+  assert.equal(await parseCardText('#/settings'), null);
   assert.equal(await parseCardText('こんにちは'), null);
 });
