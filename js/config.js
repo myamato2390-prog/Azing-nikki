@@ -3,6 +3,6 @@
 // 読み書きできる範囲は Firebase 側のルールでしぼる（SPEC.md 6-2）。
 // 空のままなら、カードは保管せず、長いリンクで送る
 export const SHARE = {
-  projectId: '',
-  apiKey: '',
+  projectId: 'omame-nikki',
+  apiKey: 'AIzaSyBhz07lEFkNbBH1xZbrmFgplur0B8jHfMI',
 };
