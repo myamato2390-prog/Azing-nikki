@@ -77,15 +77,76 @@ export function parseWeather(json, date, startTime = '', endTime = '') {
 
 const usable = (w) => w.tempMax !== null || w.tempMorning !== null || w.tempStart !== null || w.weather;
 
-// 予報（過去3か月〜16日先）→ だめなら過去データ
-export async function fetchWeather(lat, lon, date, startTime = '', endTime = '', fetchFn = fetch) {
+// ---------- 気象庁の予報（Open-Meteo に断られたときの代わり） ----------
+// 愛媛県の予報（www.jma.go.jp/bosai）。地域（中予・南予）ごとの今日・明日の天気・風向・気温。
+// 1時間ごとの値や風速はないので、天気・風向・朝の気温（最低）・最高気温だけを入れる
+export const JMA_URL = 'https://www.jma.go.jp/bosai/forecast/data/forecast/380000.json';
+// 佐田岬まわりの港は南予（宇和島の気温）、伊予市・松山に近い港は中予（松山の気温）
+export const jmaArea = (lat, lon) => (lat >= 33.62 && lon >= 132.55
+  ? { area: '中予', temp: '松山' } : { area: '南予', temp: '宇和島' });
+const JMA_DIRS = ['北東', '北西', '南東', '南西', '北', '東', '南', '西'];
+export function jmaWeatherWord(code) {
+  const c = String(code || '')[0];
+  return c === '1' ? '晴れ' : c === '2' ? '曇り' : c === '3' || c === '4' ? '雨' : '';
+}
+export function parseJma(json, date, lat, lon) {
+  const { area, temp } = jmaArea(lat, lon);
+  const ts = json?.[0]?.timeSeries || [];
+  const out = { weather: '', tempMorning: null, tempMax: null, tempStart: null, windDir: '', windSpeed: null, windMax: null };
+  const day = ts[0];
+  const a = day?.areas?.find((x) => x.area?.name === area);
+  const di = (day?.timeDefines || []).findIndex((t) => t.startsWith(date));
+  if (a && di >= 0) {
+    out.weather = jmaWeatherWord(a.weatherCodes?.[di]);
+    const w = (a.winds?.[di] || '').replace(/\s+/g, '');
+    const m = w.match(new RegExp(`(${JMA_DIRS.join('|')})の風`));
+    if (m) out.windDir = m[1];
+  }
+  const tt = ts.find((x) => x.areas?.some((y) => y.temps));
+  const ta = tt?.areas?.find((x) => x.area?.name === temp);
+  (tt?.timeDefines || []).forEach((t, i) => {
+    if (!t.startsWith(date) || !ta) return;
+    const v = Number(ta.temps[i]);
+    if (ta.temps[i] === '' || isNaN(v)) return;
+    if (t.includes('T09:')) out.tempMax = v; // 9時の値＝その日の最高
+    else if (t.includes('T00:')) out.tempMorning = v; // 0時の値＝その日の最低（朝の気温のめやす）
+  });
+  return out;
+}
+
+// うまくいかなかった理由：limit（予報サービスが混み合っている）| range（日付が範囲外）| offline（電波なし）| other
+export class WeatherError extends Error {
+  constructor(reason) { super('天気を取得できませんでした'); this.reason = reason; }
+}
+
+// 同じ場所・日付・時刻の予報は、しばらく使い回す（問い合わせを減らすため）
+const cache = new Map();
+const CACHE_MS = 60 * 60 * 1000;
+
+// 予報（過去3か月〜16日先）→ だめなら過去データ → それも断られたら気象庁の予報（今日・明日だけ）
+// 返す値に source: 'open-meteo' | 'jma' を付ける
+export async function fetchWeather(lat, lon, date, startTime = '', endTime = '', fetchFn = fetch, now = Date.now()) {
+  const key = [lat, lon, date, startTime, endTime].join('|');
+  const hit = cache.get(key);
+  if (hit && now - hit.at < CACHE_MS) return hit.w;
+  let limited = false, reached = false;
   for (const archive of [false, true]) {
     try {
       const res = await fetchFn(weatherUrl(lat, lon, date, archive));
+      reached = true;
+      if (res.status === 429) { limited = true; continue; }
       if (!res.ok) continue;
       const w = parseWeather(await res.json(), date, startTime, endTime);
-      if (usable(w)) return w;
+      if (usable(w)) { const r = { ...w, source: 'open-meteo' }; cache.set(key, { at: now, w: r }); return r; }
     } catch { /* 次を試す */ }
   }
-  throw new Error('天気を取得できませんでした');
+  try {
+    const res = await fetchFn(JMA_URL);
+    reached = true;
+    if (res.ok) {
+      const w = parseJma(await res.json(), date, lat, lon);
+      if (usable(w) || w.windDir) { const r = { ...w, source: 'jma' }; cache.set(key, { at: now, w: r }); return r; }
+    }
+  } catch { /* 下で理由を決める */ }
+  throw new WeatherError(!reached ? 'offline' : limited ? 'limit' : 'range');
 }

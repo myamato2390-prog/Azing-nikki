@@ -18,7 +18,7 @@ import { SHARE } from './config.js';
 import { packToLink, parseCardText, uploadPack, downloadPack, shortLinkMessage, shareIdIn, makeCardPack, checkCardPack, importCardPack, friendsOf, analysisTrips, ownTrips, isShared, sharedFrom } from './cards.js';
 import { shiomawari, tideForTrip } from './tide.js';
 
-const APP_VERSION = '0.6.0';
+const APP_VERSION = '0.6.1';
 
 const state = {
   trips: [],
@@ -985,10 +985,15 @@ function viewEdit(id, tab = 'before') {
       if (w.windMax !== null) sea.windMax = w.windMax;
       sea.weatherAuto = true;
       refreshInputs(); touch(); refreshBoard();
-      $('#weather-note', root).textContent = `${t.river || '現在地'}付近の${t.startTime ? '釣りの時間帯' : '18〜24時'}の予報を入れました`;
-    } catch {
+      $('#weather-note', root).textContent = w.source === 'jma'
+        ? '気象庁の予報（地域ごとの大まかな天気・風向・気温）を入れました。風速は入りません'
+        : `${t.river || '現在地'}付近の${t.startTime ? '釣りの時間帯' : '18〜24時'}の予報を入れました`;
+    } catch (err) {
       $('#weather-note', root).textContent = '';
-      if (!silent) toast(navigator.onLine ? '天気を取得できませんでした（16日より先の日付は取得できません）' : '電波がないため天気を取得できません');
+      const why = !navigator.onLine || err.reason === 'offline' ? '電波がないため、天気を取得できません'
+        : err.reason === 'limit' ? '天気の予報サービスが混み合っていて、取得できませんでした。時間をおいて「天気・風・気温を自動入力」を押してください'
+          : '天気を取得できませんでした（16日より先の日付や、古すぎる日付は取得できません）';
+      if (!silent) toast(why);
     }
   };
   const weatherEmpty = () => !S().weather && !has(S().tempMax) && !has(S().sea.windSpeed) && !S().sea.windDir;
