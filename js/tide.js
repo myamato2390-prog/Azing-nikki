@@ -205,17 +205,17 @@ const hm = (hours) => {
   return `${String(Math.floor(mm / 60)).padStart(2, '0')}:${String(mm % 60).padStart(2, '0')}`;
 };
 
-// 釣行の満潮・干潮（めやす）。夕方以降に始める釣行（開始が12時以降・未入力）は当日12時〜翌日12時、
-// 朝からの釣行は当日0〜24時。offsetMin は港ごとの補正（分）
+// 釣行の満潮・干潮（めやす）。潮見表と同じく、その日（釣行の日付）の0〜24時。
+// 夜釣りで日付をまたいでも、翌日の分は出さない（作者の決定、v0.6.2）。offsetMin は港ごとの補正（分）
 // → { highs: [{ time, cm, nextDay }], lows: [...], station: '松山' }
 export function tideForTrip(side, date, startTime = '', offsetMin = 0) {
   const station = SIDE_STATION[side];
   if (!station || !/^\d{4}-\d{2}-\d{2}$/.test(date || '')) return null;
-  const night = !startTime || startTime >= '12:00';
-  const [from, to] = night ? [12, 36] : [0, 24];
+  void startTime; // 前は開始時刻で範囲を変えていた。呼び出し側の形はそのまま
+  const [from, to] = [0, 24];
   const off = (Number(offsetMin) || 0) / 60;
   const ev = tideEvents(station, date, from - off, to - off).map((e) => ({ ...e, h: e.h + off }));
-  const conv = (e) => ({ time: hm(e.h), cm: e.cm, nextDay: e.h >= 24 });
+  const conv = (e) => ({ time: hm(e.h), cm: e.cm, nextDay: false });
   return {
     highs: ev.filter((e) => e.type === 'high').map(conv),
     lows: ev.filter((e) => e.type === 'low').map(conv),

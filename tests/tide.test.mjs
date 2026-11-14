@@ -51,23 +51,23 @@ for (const st of ['MT', 'UW']) {
   });
 }
 
-test('tideForTrip: side picks the station, night window, offset', () => {
-  // 2026-01-01 松山：満潮 07:39(313) 18:58(268)、干潮 00:37(20) 13:37(132)／翌日 満潮 08:34、干潮 01:24 ごろ
+test('tideForTrip: side picks the station, same-day table (0-24h), offset', () => {
+  // 2026-01-01 松山の潮見表：満潮 07:39(313) 18:58(268)、干潮 00:37(20) 13:37(132)
+  const near = (a, b, min) => Math.abs((+a.slice(0, 2) * 60 + +a.slice(3)) - (+b.slice(0, 2) * 60 + +b.slice(3))) <= min;
+  // 夜釣り（18:30開始）でも、その日の0〜24時の潮見表（翌日の朝は出さない）
   const seto = tideForTrip('seto', '2026-01-01', '18:30');
   assert.equal(seto.station, '松山');
-  assert.equal(seto.highs[0].nextDay, false);
-  const near = (a, b, min) => Math.abs((+a.slice(0, 2) * 60 + +a.slice(3)) - (+b.slice(0, 2) * 60 + +b.slice(3))) <= min;
-  assert.ok(near(seto.highs[0].time, '18:58', 10), seto.highs[0].time);
-  assert.ok(seto.highs.some((h) => h.nextDay && near(h.time, '08:34', 10)), JSON.stringify(seto.highs));
-  assert.ok(seto.lows.some((l) => l.nextDay), JSON.stringify(seto.lows));
+  assert.deepEqual(seto.highs.map((h) => h.nextDay), [false, false]);
+  assert.ok(near(seto.highs[0].time, '07:39', 10) && near(seto.highs[1].time, '18:58', 10), JSON.stringify(seto.highs));
+  assert.ok(near(seto.lows[0].time, '00:37', 10) && near(seto.lows[1].time, '13:37', 10), JSON.stringify(seto.lows));
+  assert.ok(seto.lows.every((l) => !l.nextDay));
+  // 開始時刻にかかわらず同じ
+  assert.deepEqual(tideForTrip('seto', '2026-01-01', '05:00'), seto);
+  assert.deepEqual(tideForTrip('seto', '2026-01-01', ''), seto);
   // 宇和海側は宇和島。同じ日でも時刻がちがう
   const uwa = tideForTrip('uwa', '2026-01-01', '18:30');
   assert.equal(uwa.station, '宇和島');
   assert.notEqual(uwa.highs[0].time, seto.highs[0].time);
-  // 朝からの釣行は当日0〜24時
-  const day = tideForTrip('seto', '2026-01-01', '05:00');
-  assert.ok(day.highs.every((h) => !h.nextDay));
-  assert.ok(near(day.highs[0].time, '07:39', 10), day.highs[0].time);
   // 港ごとの補正（+30分）
   const off = tideForTrip('seto', '2026-01-01', '18:30', 30);
   const m = (t) => +t.slice(0, 2) * 60 + +t.slice(3);

@@ -18,7 +18,7 @@ import { SHARE } from './config.js';
 import { packToLink, parseCardText, uploadPack, downloadPack, shortLinkMessage, shareIdIn, makeCardPack, checkCardPack, importCardPack, friendsOf, analysisTrips, ownTrips, isShared, sharedFrom } from './cards.js';
 import { shiomawari, tideForTrip } from './tide.js';
 
-const APP_VERSION = '0.6.1';
+const APP_VERSION = '0.6.2';
 
 const state = {
   trips: [],
@@ -1021,7 +1021,7 @@ function viewEdit(id, tab = 'before') {
     $('#tide-note', root).textContent = !t.sea.side
       ? '港を選ぶと、満潮・干潮のめやすが自動で入ります。'
       : t.sea.tide.auto
-        ? `めやす：${t.sea.tide.station || ''}（${sideName(t.sea.side)}の基準）の潮から計算${off ? `・補正${off > 0 ? '+' : ''}${off}分` : ''}${!t.startTime || t.startTime >= '12:00' ? '。午前の時刻は翌日です' : ''}`
+        ? `めやす：${t.sea.tide.station || ''}（${sideName(t.sea.side)}の基準）の潮から計算${off ? `・補正${off > 0 ? '+' : ''}${off}分` : ''}。その日（0〜24時）の潮見表です`
         : '手で直した値です。';
     $('#tide-auto', root).hidden = t.sea.tide.auto || !t.sea.side;
   };
@@ -1048,11 +1048,11 @@ function viewEdit(id, tab = 'before') {
     tideNote();
   };
 
-  // 満潮・干潮の入力欄 → 記録（空の欄は入れない。午前の時刻は翌日とみなす）
+  // 満潮・干潮の入力欄 → 記録（空の欄は入れない。潮見表と同じく、その日の時刻）
   const syncTide = () => {
     for (const key of ['highs', 'lows']) {
       S().sea.tide[key] = slots[key].filter((x) => x.time || has(x.cm))
-        .map((x) => ({ time: x.time, cm: has(x.cm) ? Number(x.cm) : null, nextDay: isNextDayTime(S(), x.time) }));
+        .map((x) => ({ time: x.time, cm: has(x.cm) ? Number(x.cm) : null, nextDay: false }));
     }
   };
 
@@ -1805,6 +1805,22 @@ async function load() {
   state.friends = await db.getKV('friends', {});
   const lk = await db.getKV('lastKinds', ['aji']);
   state.lastKinds = Array.isArray(lk) && lk.length && lk.every((k) => KINDS.includes(k)) ? lk : ['aji'];
+  await retideToSameDay();
+}
+
+// v0.6.1 までの夜釣りの記録は、満潮・干潮を「当日12時〜翌日12時」で入れていた。
+// 自動のままの記録は、その日（0〜24時）の潮見表で入れ直して保存する。手で直した値はそのまま
+async function retideToSameDay() {
+  const fix = [];
+  for (const t of state.trips) {
+    const tide = t.sea?.tide;
+    if (!tide?.auto || isShared(t) || ![...tide.highs, ...tide.lows].some((x) => x.nextDay)) continue;
+    const r = tideForTrip(t.sea.side, t.date, t.startTime, placeSetting(t.river)?.tideOffsetMin || 0);
+    if (!r) continue;
+    tide.highs = r.highs.slice(0, 2); tide.lows = r.lows.slice(0, 2); tide.station = r.station;
+    fix.push(t);
+  }
+  if (fix.length) await db.putMany('trips', fix);
 }
 
 async function start() {
