@@ -3,7 +3,7 @@ import {
   APP_ID, KIND, KINDS, KIND_COLOR, kindName, DEFAULT_PLACES, THEME_COLOR, SIDES, SIDE_COLOR, sideName, defaultPlace,
   WEATHER, WIND_DIRS, LIGHTS, SHIOMAWARI, SIZE_FEEL, JIAI, TIDE_STAGES, JIG_WEIGHTS, RANGES, ACTIONS, BYCATCH, LINE_TYPES, TACKLE_FIELDS,
   TACHI_TACKLE_FIELDS, RIGS, TENYA_WEIGHTS, BAITS, HYBRID, TACHI_ACTIONS, F_SIZES, SHARED_KEYS,
-  newTrip, normalizeTrip, sortTrips, formatDate, formatWeather, formatDayTemps, formatWind, formatHighs, formatLows,
+  newTrip, normalizeTrip, sortTrips, formatDate, formatWeather, formatSun, formatDayTemps, formatWind, formatHighs, formatLows,
   formatMoves, formatTimeRange, endsNextDay, isNextDayTime, formatClock, normalizeTime, tackleSummary, block, sizesTotal, maxF,
   starKey, starItem, starLabel, starState, cycleStar, starredFirst, starText,
   has, num, uid, todayISO, seasonOf,
@@ -17,8 +17,9 @@ import { fetchWeather } from './weather.js';
 import { SHARE } from './config.js';
 import { packToLink, parseCardText, uploadPack, downloadPack, shortLinkMessage, shareIdIn, makeCardPack, checkCardPack, importCardPack, friendsOf, analysisTrips, ownTrips, isShared, sharedFrom } from './cards.js';
 import { shiomawari, tideForTrip } from './tide.js';
+import { sunTimes } from './sun.js';
 
-const APP_VERSION = '0.6.2';
+const APP_VERSION = '0.7.0';
 
 const state = {
   trips: [],
@@ -200,6 +201,13 @@ function readValue(el) {
 }
 
 // 港（内部の項目名は鮎日記と同じ river）
+// 日の出・日の入り。記録にあればそれを、なければ港の位置と日付から計算する（古い記録・仲間のカード用）
+function sunOf(t) {
+  if (t.sunrise || t.sunset) return { sunrise: t.sunrise, sunset: t.sunset };
+  const ps = placeSetting(t.river);
+  const pos = ps && has(ps.lat) && has(ps.lon) ? ps : defaultPlace(t.river);
+  return pos ? sunTimes(t.date, pos.lat, pos.lon) : { sunrise: '', sunset: '' };
+}
 function placeSetting(name) {
   return state.places.find((r) => r.name === name);
 }
@@ -420,6 +428,7 @@ function cardHtml(t) {
       ${cell(a.tide.auto ? '満潮（めやす）' : '満潮', esc(highs), 'w2')}
       ${cell(a.tide.auto ? '干潮（めやす）' : '干潮', esc(lows), 'w2')}
       ${cell('風', esc(wind), 'w2')}
+      ${cell('日の出／入り', esc(formatSun(sunOf(t))), 'w2 sun')}
       ${cell('朝／最高', esc(formatDayTemps(t).replace('朝', '').replace('最高', '')), 'w2')}
       ${cell('水温', has(t.waterTemp) ? `${esc(t.waterTemp)}℃` : '')}
       ${cell('タックル', esc(tackle), 'wide')}
@@ -805,6 +814,7 @@ function viewEdit(id, tab = 'before') {
         ${input(form, 's.river', 'list="dl-river" placeholder="その他の港は入力"')}`)}
       <div id="side-pick" hidden>${group('この港はどちら側？', chips(form, 's.sea.side', Object.entries(SIDES)))}</div>
       <div id="place-stats" class="hint"></div>
+      <div id="sun-line" class="sun-line"></div>
 
       <h3>潮</h3>
       ${group('潮回り（日付から自動）', chips(form, 's.sea.tide.shiomawari', SHIOMAWARI))}
@@ -853,6 +863,7 @@ function viewEdit(id, tab = 'before') {
     ${datalist('dl-river', placeNames())}
   `;
     refreshPlace();
+    refreshSun();
     fillTide();
     refreshEndNote();
     refreshBoard();
@@ -925,6 +936,17 @@ function viewEdit(id, tab = 'before') {
       return st ? `📍 この港の${kindName(k)} ${st.trips}回：平均${st.avg}匹・最多${st.best}匹${st.max ? `・最大${st.max}${k === 'tachiuo' ? '' : 'cm'}` : ''}` : '';
     }).filter(Boolean);
     $('#place-stats', root).innerHTML = lines.map(esc).join('<br>');
+  };
+
+  // 日の出・日の入り：港の位置と日付から計算して入れる（電波はいらない）
+  const refreshSun = () => {
+    const t = S();
+    const s = sunOf({ ...t, sunrise: '', sunset: '' });
+    t.sunrise = s.sunrise; t.sunset = s.sunset;
+    const [rise, set] = formatSun(t).split('／');
+    $('#sun-line', root).innerHTML = t.sunrise || t.sunset
+      ? `🌅 日の出 <b>${esc(rise)}</b>　🌇 日の入り <b>${esc(set)}</b><span class="muted">（${esc(t.river)}付近の計算値）</span>`
+      : '<span class="muted">港を選ぶと、日の出・日の入りの時刻が自動で入ります。</span>';
   };
 
   const refreshEndNote = () => {
@@ -1109,6 +1131,7 @@ function viewEdit(id, tab = 'before') {
       autoShio = next;
       refreshInputs();
     }
+    if (path === 's.date' || path === 's.river') refreshSun();
     if (path === 's.date' || path === 's.sea.side') fillTide();
     if (WEATHER_PATHS.includes(path)) t.sea.weatherAuto = false;
     // 時刻や日付を入れたら、自動入力のままの天気・風を取り直す

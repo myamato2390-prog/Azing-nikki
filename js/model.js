@@ -112,7 +112,7 @@ export function emptyTachiuo() {
 const EMPTY = { aji: emptyAji, tachiuo: emptyTachiuo };
 
 // 「両方」の日に2つの記録で同じ値にする項目
-export const SHARED_KEYS = ['date', 'river', 'point', 'startTime', 'endTime', 'weather', 'tempMorning', 'tempMax', 'waterTemp', 'moves', 'sea', 'pairId'];
+export const SHARED_KEYS = ['date', 'river', 'point', 'startTime', 'endTime', 'weather', 'tempMorning', 'tempMax', 'waterTemp', 'sunrise', 'sunset', 'moves', 'sea', 'pairId'];
 
 export function newTrip(date = todayISO(), kind = KIND) {
   const now = new Date().toISOString();
@@ -123,6 +123,7 @@ export function newTrip(date = todayISO(), kind = KIND) {
     pairId: '', // 「両方」の日は、アジとタチウオの記録に同じ値を入れる
     river: '', point: '', startTime: '', endTime: '',
     weather: '', tempMorning: null, tempMax: null, waterTemp: null,
+    sunrise: '', sunset: '', // 日の出・日の入り（港の位置と日付から自動で計算。鮎日記と同じ名前）
     moves: [],
     title: '',
     count: null, maxSize: null, bare: null,
@@ -306,6 +307,11 @@ export function formatWeather(t) {
 // 「朝8℃／最高17℃」（鮎日記と共通の項目）
 export function formatDayTemps(t) {
   return [has(t.tempMorning) ? `朝${t.tempMorning}℃` : '', has(t.tempMax) ? `最高${t.tempMax}℃` : ''].filter(Boolean).join('／');
+}
+// 「6:47／17:05」（先頭の0は取る。鮎日記と同じ）
+export function formatSun(t) {
+  const hm = (s) => String(s || '').replace(/^0(\d):/, '$1:');
+  return t.sunrise || t.sunset ? `${hm(t.sunrise) || '?'}／${hm(t.sunset) || '?'}` : '';
 }
 // 「北西 3m/s（最大6）」
 export function formatWind(t) {

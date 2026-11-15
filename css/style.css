@@ -406,3 +406,9 @@ body.is-test .deck.with-banner { height: calc(100dvh - var(--top-h) - var(--nav-
 .friend-main span { white-space: normal !important; }
 .friend-main b { white-space: nowrap; }
 #paste-box { width: 100%; min-height: 120px; padding: 10px 12px; border: 1px solid var(--field-line); border-radius: 10px; background: var(--field); font-size: 13px; }
+
+/* 日の出・日の入り（v0.7.0） */
+.cell.sun { white-space: nowrap; }
+.sun-line { margin: 0 0 6px; font-size: 14px; }
+.sun-line b { font-size: 16px; margin-right: 2px; }
+.sun-line .muted { margin-left: 4px; font-size: 12px; }

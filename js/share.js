@@ -1,6 +1,6 @@
 // カードを画像（PNG）にしてLINEなどへ共有する
 import {
-  formatDate, formatWeather, formatDayTemps, formatWind, formatHighs, formatLows, formatTimeRange,
+  formatDate, formatWeather, formatSun, formatDayTemps, formatWind, formatHighs, formatLows, formatTimeRange,
   has, formatMoves, formatClock, THEME_COLOR, sideName, starText, tackleSummary, kindName, KIND_COLOR, formatSizes, maxF, block,
 } from './model.js';
 
@@ -88,11 +88,12 @@ function draw(ctx, t, photo, measureOnly, color) {
   const tide = [a.tide.shiomawari, formatHighs(t) ? `満潮 ${formatHighs(t)}` : '', formatLows(t) ? `干潮 ${formatLows(t)}` : ''].filter(Boolean).join('　');
   const weather = [formatWeather(t), formatWind(t)].filter(Boolean).join('　');
   const temps = [formatDayTemps(t), has(t.waterTemp) ? `水温${t.waterTemp}℃` : ''].filter(Boolean).join('　');
-  if (tide || weather || temps || a.light) {
+  if (tide || weather || temps || a.light || formatSun(t)) {
     section('状況');
     row('潮', tide);
     row('天気・風', weather);
     row('気温', temps);
+    row('日の出／入り', formatSun(t));
     row('常夜灯', a.light);
   }
 
